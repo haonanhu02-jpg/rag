@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "report_id": "rag-greenfield-r3-document-compiler",
+  "stage": "R3",
+  "status": "completed",
+  "generated_at": "2026-08-13",
+  "source": {
+    "commit": "dc2ef602c4f509755f2e47fa81b0ddc69893626f"
+  },
+  "scope": {
+    "capabilities": [
+      "CAP-01",
+      "CAP-02",
+      "CAP-03",
+      "CAP-04",
+      "CAP-35"
+    ],
+    "document_formats": [
+      "pdf",
+      "docx",
+      "pptx",
+      "xlsx",
+      "txt",
+      "md",
+      "html",
+      "image"
+    ],
+    "block_kinds": [
+      "heading",
+      "paragraph",
+      "list",
+      "table",
+      "image",
+      "code"
+    ],
+    "chunk_methods": [
+      "general",
+      "paper",
+      "book",
+      "manual",
+      "laws",
+      "qa",
+      "table",
+      "resume",
+      "picture"
+    ],
+    "multimodal_rag": "parsing_foundation_only"
+  },
+  "evidence": {
+    "legacy_behavior_observations": 4,
+    "format_golden": true,
+    "resource_and_error_gates": true,
+    "stable_block_and_chunk_ids": true,
+    "postgres_pgvector_multiformat_e2e": true,
+    "tesseract_adapter": true,
+    "tesseract_binary_executed": true,
+    "tesseract_binary_reason": "Tesseract 5.5.0 and eng language were invoked in an isolated Linux container; the first small-font sample returned no words and exposed the need for the committed real-runtime CI gate",
+    "source_reuse": "none"
+  },
+  "migration_head": "20260813_0003",
+  "next_stage": "R4"
+}

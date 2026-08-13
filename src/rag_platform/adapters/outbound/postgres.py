@@ -108,6 +108,13 @@ document_versions = Table(
     Column("object_key", String(1000), nullable=False),
     Column("size_bytes", BigInteger, nullable=False),
     Column("activated_at", DateTime(timezone=True), nullable=True),
+    Column("chunk_method", String(32), nullable=False, server_default="general"),
+    Column("parser_name", String(100), nullable=True),
+    Column("parser_version", String(50), nullable=True),
+    Column("parse_schema_version", Integer, nullable=True),
+    Column("parse_warnings", JSONB, nullable=False, server_default="[]"),
+    Column("page_count", Integer, nullable=True),
+    Column("normalized_sha256", String(64), nullable=True),
 )
 ingestion_jobs = Table(
     "ingestion_jobs",
@@ -148,6 +155,15 @@ document_blocks = Table(
     Column("text", Text, nullable=False),
     Column("start_character", Integer, nullable=False),
     Column("end_character", Integer, nullable=False),
+    Column("page_number", Integer, nullable=True),
+    Column("bounding_box", JSONB, nullable=True),
+    Column("heading_path", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("table_metadata", JSONB, nullable=True),
+    Column("media_reference", JSONB, nullable=True),
+    Column("confidence", Float, nullable=True),
+    Column("parser_name", String(100), nullable=False, server_default="plain-text"),
+    Column("parser_version", String(50), nullable=False, server_default="1"),
+    Column("warnings", JSONB, nullable=False, server_default="[]"),
 )
 document_chunks = Table(
     "document_chunks",
@@ -325,10 +341,11 @@ class PostgresKnowledgeRepository:
         source_sha256: str,
         size_bytes: int,
         idempotency_key: str,
+        chunk_method: str,
         now: datetime,
     ) -> UploadSubmission:
         request_sha256 = hashlib.sha256(
-            f"{knowledge_base_id}\x1f{file_name}\x1f{media_type}\x1f{source_sha256}".encode()
+            f"{knowledge_base_id}\x1f{file_name}\x1f{media_type}\x1f{source_sha256}\x1f{chunk_method}".encode()
         ).hexdigest()
         with self._engine.begin() as connection:
             existing = (
@@ -383,13 +400,17 @@ class PostgresKnowledgeRepository:
                         document_versions.c.tenant_id == context.tenant_id.value,
                         document_versions.c.document_id == document_id.value,
                         document_versions.c.source_sha256 == source_sha256,
+                        document_versions.c.chunk_method == chunk_method,
                     )
                 )
                 .mappings()
                 .one_or_none()
             )
             version_id = DocumentVersionId(
-                uuid5(_STABLE_NAMESPACE, f"version:{document_id}:{source_sha256}")
+                uuid5(
+                    _STABLE_NAMESPACE,
+                    f"version:{document_id}:{source_sha256}:{chunk_method}",
+                )
             )
             if existing_version is None:
                 revision = cast(
@@ -414,6 +435,7 @@ class PostgresKnowledgeRepository:
                         media_type=media_type,
                         object_key=object_key,
                         size_bytes=size_bytes,
+                        chunk_method=chunk_method,
                     )
                 )
             else:
@@ -510,6 +532,7 @@ class PostgresKnowledgeRepository:
                         document_versions.c.media_type,
                         document_versions.c.object_key,
                         document_versions.c.source_sha256,
+                        document_versions.c.chunk_method,
                     )
                     .join(
                         document_versions,
@@ -548,6 +571,30 @@ class PostgresKnowledgeRepository:
         if dimensions != 8 or any(len(vector) != dimensions for vector in vectors):
             raise ValueError("R2 pgvector profile requires 8 dimensions")
         with self._engine.begin() as connection:
+            parsed = document.parsed_document
+            connection.execute(
+                update(document_versions)
+                .where(document_versions.c.id == source.job.document_version_id.value)
+                .values(
+                    parser_name=None if parsed is None else parsed.parser_name,
+                    parser_version=None if parsed is None else parsed.parser_version,
+                    parse_schema_version=None if parsed is None else parsed.schema_version,
+                    parse_warnings=(
+                        []
+                        if parsed is None
+                        else [
+                            {
+                                "code": warning.code,
+                                "message": warning.message,
+                                "page_number": warning.page_number,
+                            }
+                            for warning in parsed.warnings
+                        ]
+                    ),
+                    page_count=None if parsed is None else parsed.page_count,
+                    normalized_sha256=document.normalized_sha256,
+                )
+            )
             active = (
                 connection.execute(
                     select(index_versions).where(
@@ -597,6 +644,49 @@ class PostgresKnowledgeRepository:
                             "text": block.text,
                             "start_character": block.start_character,
                             "end_character": block.end_character,
+                            "page_number": block.page_number,
+                            "bounding_box": (
+                                None
+                                if block.bounding_box is None
+                                else {
+                                    "x0": block.bounding_box.x0,
+                                    "y0": block.bounding_box.y0,
+                                    "x1": block.bounding_box.x1,
+                                    "y1": block.bounding_box.y1,
+                                    "coordinate_space": block.bounding_box.coordinate_space,
+                                }
+                            ),
+                            "heading_path": list(block.heading_path),
+                            "table_metadata": (
+                                None
+                                if block.table is None
+                                else {
+                                    "rows": block.table.rows,
+                                    "columns": block.table.columns,
+                                    "has_header": block.table.has_header,
+                                }
+                            ),
+                            "media_reference": (
+                                None
+                                if block.media is None
+                                else {
+                                    "media_type": block.media.media_type,
+                                    "embedded_path": block.media.embedded_path,
+                                    "width": block.media.width,
+                                    "height": block.media.height,
+                                }
+                            ),
+                            "confidence": block.confidence,
+                            "parser_name": block.parser_name,
+                            "parser_version": block.parser_version,
+                            "warnings": [
+                                {
+                                    "code": warning.code,
+                                    "message": warning.message,
+                                    "page_number": warning.page_number,
+                                }
+                                for warning in block.warnings
+                            ],
                         }
                         for block in document.blocks
                     ],
@@ -880,4 +970,5 @@ class PostgresKnowledgeRepository:
             str(row["media_type"]),
             str(row["object_key"]),
             str(row["source_sha256"]),
+            str(row["chunk_method"]),
         )

@@ -6,7 +6,17 @@ from collections.abc import Callable
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from rag_platform.bootstrap.r2_runtime import R2Runtime
@@ -97,6 +107,7 @@ def build_router(runtime: R2Runtime) -> APIRouter:
         file: Annotated[UploadFile, File()],
         context: Annotated[AuthorizationContext, Depends(_context)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+        chunk_method: Annotated[str, Form()] = "general",
     ) -> dict[str, object]:
         content = file.file.read(runtime.knowledge.max_upload_bytes + 1)
         submitted = runtime.knowledge.upload(
@@ -106,6 +117,7 @@ def build_router(runtime: R2Runtime) -> APIRouter:
             media_type=(file.content_type or "application/octet-stream").split(";", maxsplit=1)[0],
             content=content,
             idempotency_key=idempotency_key,
+            chunk_method=chunk_method,
         )
         return {
             "job_id": str(submitted.job.id),

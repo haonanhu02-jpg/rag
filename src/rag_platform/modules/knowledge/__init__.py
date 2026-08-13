@@ -1,6 +1,6 @@
 """Minimum knowledge ingestion contracts and use cases."""
 
-from rag_platform.modules.knowledge.compiler import PlainTextDocumentCompiler
+from rag_platform.modules.knowledge.compiler import DocumentCompiler, PlainTextDocumentCompiler
 from rag_platform.modules.knowledge.contracts import (
     CompiledBlock,
     CompiledChunk,
@@ -18,6 +18,7 @@ __all__ = [
     "CompiledBlock",
     "CompiledChunk",
     "CompiledDocument",
+    "DocumentCompiler",
     "IngestionJobRecord",
     "IngestionSource",
     "KnowledgeBaseRecord",

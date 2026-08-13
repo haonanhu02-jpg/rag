@@ -8,6 +8,8 @@ from datetime import datetime
 from rag_platform.domain.authorization import AuthorizationContext
 from rag_platform.domain.identifiers import ActorId, KnowledgeBaseId
 from rag_platform.domain.policies import CorePolicies, ResourceNotFound
+from rag_platform.modules.knowledge.chunking import CHUNK_METHODS
+from rag_platform.modules.knowledge.compiler import DocumentFormatRouter
 from rag_platform.modules.knowledge.contracts import (
     KnowledgeBaseRecord,
     KnowledgeRepository,
@@ -15,8 +17,6 @@ from rag_platform.modules.knowledge.contracts import (
     UploadSubmission,
 )
 from rag_platform.modules.ports import Clock, IdGenerator, ObjectStore
-
-_R2_MEDIA_TYPES = frozenset({"text/plain", "text/markdown"})
 
 
 class KnowledgeService:
@@ -76,17 +76,19 @@ class KnowledgeService:
         media_type: str,
         content: bytes,
         idempotency_key: str,
+        chunk_method: str = "general",
     ) -> UploadSubmission:
         CorePolicies.require_role(context, "owner", "admin", "editor")
         CorePolicies.require_knowledge_base(context, knowledge_base_id)
         if self._repository.get_knowledge_base(context, knowledge_base_id) is None:
             raise ResourceNotFound("knowledge base not found")
-        if media_type not in _R2_MEDIA_TYPES:
-            raise UnsupportedDocument(f"unsupported R2 media type: {media_type}")
         if not file_name.strip() or not idempotency_key.strip() or not content:
             raise ValueError("file name, content, and idempotency key are required")
         if len(content) > self._max_upload_bytes:
             raise UnsupportedDocument("upload exceeds the configured byte limit")
+        if chunk_method not in CHUNK_METHODS:
+            raise UnsupportedDocument(f"unsupported chunk method: {chunk_method}")
+        DocumentFormatRouter.resolve(file_name=file_name, media_type=media_type, content=content)
         digest = hashlib.sha256(content).hexdigest()
         object_key = f"knowledge/{knowledge_base_id}/{digest}"
         self._object_store.put(tenant_id=context.tenant_id, key=object_key, value=content)
@@ -99,6 +101,7 @@ class KnowledgeService:
             source_sha256=digest,
             size_bytes=len(content),
             idempotency_key=idempotency_key.strip(),
+            chunk_method=chunk_method,
             now=self._now(),
         )
 

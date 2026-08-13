@@ -11,6 +11,7 @@ from rag_platform.compatibility import (
     DriverStatus,
     NotImplementedNewDriver,
     R2MinimumNewDriver,
+    R3NewDriver,
     SubprocessDriver,
 )
 from rag_platform.compatibility.drivers import DriverProtocolError
@@ -39,9 +40,9 @@ def test_subprocess_driver_round_trips_json_protocol() -> None:
 
     result = driver.invoke(DriverRequest("CAP-01", "CAP-01-BASELINE"))
 
-    assert result.status is DriverStatus.NOT_IMPLEMENTED
-    assert result.error is not None
-    assert result.error["capability_id"] == "CAP-01"
+    assert result.status is DriverStatus.SUCCEEDED
+    assert isinstance(result.output, dict)
+    assert result.output["implementation_status"] == "implemented"
 
 
 def test_r2_driver_reports_only_minimum_subset_evidence() -> None:
@@ -53,6 +54,18 @@ def test_r2_driver_reports_only_minimum_subset_evidence() -> None:
     assert implemented.status is DriverStatus.SUCCEEDED
     assert isinstance(implemented.output, dict)
     assert implemented.output["implementation_status"] == "minimum_subset_implemented"
+    assert remaining.status is DriverStatus.NOT_IMPLEMENTED
+
+
+def test_r3_driver_truthfully_reports_full_and_foundation_statuses() -> None:
+    driver = R3NewDriver()
+    parsing = driver.invoke(DriverRequest("CAP-01", "CAP-01-BASELINE"))
+    multimodal = driver.invoke(DriverRequest("CAP-35", "CAP-35-BASELINE"))
+    remaining = driver.invoke(DriverRequest("CAP-28", "CAP-28-BASELINE"))
+    assert isinstance(parsing.output, dict)
+    assert parsing.output["implementation_status"] == "implemented"
+    assert isinstance(multimodal.output, dict)
+    assert multimodal.output["implementation_status"] == "parsing_foundation_implemented"
     assert remaining.status is DriverStatus.NOT_IMPLEMENTED
 
 

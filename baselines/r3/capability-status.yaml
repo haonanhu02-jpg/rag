@@ -1,0 +1,20 @@
+schema_version: 1
+stage: R3
+reference_commit: ce74c58e664275ff239bcbb8c841771bc4649557
+status_vocabulary:
+  - implemented
+  - parsing_foundation_implemented
+  - not_implemented_in_new_repo
+capabilities:
+  CAP-01: implemented
+  CAP-02: implemented
+  CAP-03: implemented
+  CAP-04: implemented
+  CAP-35: parsing_foundation_implemented
+remaining_capabilities: not_implemented_in_new_repo
+limitations:
+  CAP-01: Legacy-scope PDF, DOCX, PPTX, XLSX, TXT, MD, HTML and images only.
+  CAP-02: Tesseract CPU OCR and scanned-PDF fallback; semantic layout models remain outside the legacy baseline.
+  CAP-03: Six normalized block kinds retain page, bbox, hierarchy, order, parser, warnings and media provenance.
+  CAP-04: General, Paper, Book, Manual, Laws, QA, Table, Resume and Picture; Audio and Email remain excluded.
+  CAP-35: Image/OCR provenance is ready, but multimodal retrieval and generation remain experimental R8 work.

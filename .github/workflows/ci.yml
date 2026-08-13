@@ -45,6 +45,8 @@ jobs:
           python-version: "3.13"
       - name: Install locked dependencies
         run: uv sync --frozen --all-groups
+      - name: Install OCR runtime
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
       - name: Lint
         run: uv run ruff check --no-cache .
       - name: Strict type check
@@ -57,6 +59,8 @@ jobs:
         run: uv run python scripts/check_r1_foundation.py
       - name: R2 minimum RAG gate
         run: uv run python scripts/check_r2_vertical_slice.py
+      - name: R3 document compiler gate
+        run: uv run python scripts/check_r3_document_compiler.py
       - name: Tests
         run: uv run pytest -q --cov --cov-report=term-missing
       - name: Dependency audit

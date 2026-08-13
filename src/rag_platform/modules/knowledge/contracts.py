@@ -1,10 +1,11 @@
-"""Framework-neutral contracts for the R2 knowledge vertical slice."""
+"""Framework-neutral contracts for knowledge ingestion and structured documents."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from types import MappingProxyType
 from typing import Protocol
 
@@ -25,7 +26,23 @@ from rag_platform.domain.identifiers import (
 
 
 class UnsupportedDocument(ValueError):
-    """The R2 compiler only accepts bounded UTF-8 TXT and Markdown."""
+    """The source format or its declared type cannot be accepted safely."""
+
+
+class DocumentResourceLimit(UnsupportedDocument):
+    """An untrusted document exceeded a deterministic parser resource budget."""
+
+    def __init__(self, resource: str, message: str) -> None:
+        super().__init__(message)
+        self.resource = resource
+
+
+class DocumentParseError(UnsupportedDocument):
+    """A supported document is malformed or cannot produce usable content."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class IdempotencyConflict(ValueError):
@@ -76,6 +93,116 @@ class IngestionSource:
     media_type: str
     object_key: str
     source_sha256: str
+    chunk_method: str = "general"
+
+
+class BlockKind(StrEnum):
+    HEADING = "heading"
+    PARAGRAPH = "paragraph"
+    LIST = "list"
+    TABLE = "table"
+    IMAGE = "image"
+    CODE = "code"
+
+
+class CoordinateSpace(StrEnum):
+    PAGE_POINTS = "page_points"
+    PIXELS = "pixels"
+    NORMALIZED = "normalized"
+
+
+@dataclass(frozen=True, slots=True)
+class BoundingBox:
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    coordinate_space: CoordinateSpace
+
+    def __post_init__(self) -> None:
+        if self.x1 <= self.x0 or self.y1 <= self.y0:
+            raise ValueError("bounding box must have positive dimensions")
+        if self.coordinate_space is CoordinateSpace.NORMALIZED and any(
+            value < 0 or value > 1 for value in (self.x0, self.y0, self.x1, self.y1)
+        ):
+            raise ValueError("normalized coordinates must be in [0, 1]")
+
+
+@dataclass(frozen=True, slots=True)
+class TableMetadata:
+    rows: int
+    columns: int
+    has_header: bool = False
+
+    def __post_init__(self) -> None:
+        if self.rows < 1 or self.columns < 1:
+            raise ValueError("table dimensions must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class MediaReference:
+    media_type: str
+    embedded_path: str | None = None
+    width: int | None = None
+    height: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ParseWarning:
+    code: str
+    message: str
+    page_number: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ParserLimits:
+    max_file_bytes: int = 10 * 1024 * 1024
+    max_archive_entries: int = 2_000
+    max_uncompressed_bytes: int = 100 * 1024 * 1024
+    max_compression_ratio: float = 200.0
+    max_pages: int = 500
+    max_image_pixels: int = 40_000_000
+    max_worksheets: int = 100
+    max_spreadsheet_cells: int = 1_000_000
+    ocr_timeout_seconds: float = 30.0
+
+
+@dataclass(frozen=True, slots=True)
+class OcrWord:
+    text: str
+    confidence: float
+    order: int
+    bounding_box: BoundingBox
+
+
+@dataclass(frozen=True, slots=True)
+class OcrResult:
+    engine_name: str
+    engine_version: str
+    language: str
+    words: tuple[OcrWord, ...]
+
+
+class OcrEngine(Protocol):
+    def recognize(
+        self, image: object, *, language: str, timeout_seconds: float
+    ) -> OcrResult: ...
+
+    def available_languages(self) -> frozenset[str]: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ParserRequest:
+    tenant_id: TenantId
+    knowledge_base_id: KnowledgeBaseId
+    document_id: DocumentId
+    document_version_id: DocumentVersionId
+    source_sha256: str
+    file_name: str
+    media_type: str
+    format_id: str
+    limits: ParserLimits
+    ocr_language: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +213,64 @@ class CompiledBlock:
     text: str
     start_character: int
     end_character: int
+    page_number: int | None = None
+    bounding_box: BoundingBox | None = None
+    heading_path: tuple[str, ...] = ()
+    table: TableMetadata | None = None
+    media: MediaReference | None = None
+    confidence: float | None = None
+    parser_name: str = "plain-text"
+    parser_version: str = "1"
+    warnings: tuple[ParseWarning, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.ordinal < 0 or self.start_character < 0 or self.end_character < 0:
+            raise ValueError("block positions must be non-negative")
+        if self.bounding_box is not None and self.page_number is None:
+            raise ValueError("bounding box requires a page number")
+        if self.kind == BlockKind.TABLE and self.table is None:
+            raise ValueError("table block requires table metadata")
+        if self.kind == BlockKind.IMAGE and self.media is None:
+            raise ValueError("image block requires media provenance")
+        if self.kind != BlockKind.IMAGE and not self.text.strip():
+            raise ValueError("non-image block requires text")
+
+
+ParsedBlock = CompiledBlock
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedDocument:
+    schema_version: int
+    parser_name: str
+    parser_version: str
+    source_media_type: str
+    source_name: str
+    blocks: tuple[ParsedBlock, ...]
+    warnings: tuple[ParseWarning, ...] = ()
+    page_count: int | None = None
+
+    def __post_init__(self) -> None:
+        orders = [block.ordinal for block in self.blocks]
+        if orders != list(range(len(orders))):
+            raise ValueError("parsed blocks must have contiguous source order")
+        if len({block.id for block in self.blocks}) != len(self.blocks):
+            raise ValueError("parsed block identifiers must be unique")
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedPayload:
+    parser_name: str
+    parser_version: str
+    blocks: tuple[ParsedBlock, ...]
+    warnings: tuple[ParseWarning, ...] = ()
+    page_count: int | None = None
+
+
+class BinaryDocumentParser(Protocol):
+    format_ids: frozenset[str]
+
+    def parse(self, content: bytes, request: ParserRequest) -> ParsedPayload: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +290,7 @@ class CompiledDocument:
     chunks: tuple[CompiledChunk, ...]
     normalized_sha256: str
     compiler_version: str
+    parsed_document: ParsedDocument | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +347,7 @@ class KnowledgeRepository(Protocol):
         source_sha256: str,
         size_bytes: int,
         idempotency_key: str,
+        chunk_method: str,
         now: datetime,
     ) -> UploadSubmission: ...
 

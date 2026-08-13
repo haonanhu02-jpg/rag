@@ -14,9 +14,10 @@
 
 ## 当前状态
 
-R0 兼容基线、R1 领域基础和 R2 最小独立 RAG 竖切均已完成。新项目现在可独立完成
-TXT/Markdown 上传、稳定 General Chunk、Embedding、pgvector 索引、授权向量检索、非流式回答、
-Citation 和基础 Retrieval Trace。R2 只表示相关 CAP 的最小子集；完整能力仍按 R3–R6 扩展。
+R0–R3 已完成。新项目可独立处理 PDF、DOCX、PPTX、XLSX、TXT、Markdown、HTML 与图片，
+统一保留 Block 结构、页码、坐标、顺序、解析告警和媒体来源，并提供九类稳定 Chunk Method、
+Embedding、pgvector 索引、授权向量检索、非流式回答、Citation 和基础 Retrieval Trace。
+CAP-35 当前只完成多模态解析基础；完整多模态 RAG 仍在 R8。
 
 ## 文档
 
@@ -26,6 +27,7 @@ Citation 和基础 Retrieval Trace。R2 只表示相关 CAP 的最小子集；�
 - [R0 执行记录](docs/phases/r0-compatibility-baseline.md)
 - [R1 执行记录](docs/phases/r1-domain-foundation.md)
 - [R2 执行记录](docs/phases/r2-minimum-rag.md)
+- [R3 执行记录](docs/phases/r3-document-compiler.md)
 - [风险登记](docs/risks.md)
 - [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md)
 - [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)
