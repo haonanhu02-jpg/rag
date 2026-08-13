@@ -1,1 +1,52 @@
-"""Outbound ports owned by core modules."""  from __future__ import annotations  from contextlib import AbstractContextManager from datetime import datetime from typing import Protocol, TypeVar  from rag_platform.domain.entities import KnowledgeBase from rag_platform.domain.identifiers import KnowledgeBaseId, TenantId  T_co = TypeVar("T_co", covariant=True)   class KnowledgeBaseRepository(Protocol):     def add(self, knowledge_base: KnowledgeBase) -> None: ...      def get(         self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId     ) -> KnowledgeBase | None: ...   class Transaction(AbstractContextManager[None], Protocol):     def commit(self) -> None: ...      def rollback(self) -> None: ...   class TransactionManager(Protocol):     def transaction(self) -> Transaction: ...   class ObjectStore(Protocol):     def put(self, *, tenant_id: TenantId, key: str, value: bytes) -> None: ...      def get(self, *, tenant_id: TenantId, key: str) -> bytes | None: ...   class SearchIndex(Protocol):     def healthcheck(self) -> bool: ...   class MessageQueue(Protocol):     def publish(self, topic: str, message_id: str) -> None: ...   class Clock(Protocol):     def now(self) -> datetime: ...   class IdGenerator(Protocol[T_co]):     def new(self) -> T_co: ...
+"""Outbound ports owned by core modules."""
+
+from __future__ import annotations
+
+from contextlib import AbstractContextManager
+from datetime import datetime
+from typing import Protocol, TypeVar
+
+from rag_platform.domain.entities import KnowledgeBase
+from rag_platform.domain.identifiers import KnowledgeBaseId, TenantId
+
+T_co = TypeVar("T_co", covariant=True)
+
+
+class KnowledgeBaseRepository(Protocol):
+    def add(self, knowledge_base: KnowledgeBase) -> None: ...
+
+    def get(
+        self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId
+    ) -> KnowledgeBase | None: ...
+
+
+class Transaction(AbstractContextManager[None], Protocol):
+    def commit(self) -> None: ...
+
+    def rollback(self) -> None: ...
+
+
+class TransactionManager(Protocol):
+    def transaction(self) -> Transaction: ...
+
+
+class ObjectStore(Protocol):
+    def put(self, *, tenant_id: TenantId, key: str, value: bytes) -> None: ...
+
+    def get(self, *, tenant_id: TenantId, key: str) -> bytes | None: ...
+
+
+class SearchIndex(Protocol):
+    def healthcheck(self) -> bool: ...
+
+
+class MessageQueue(Protocol):
+    def publish(self, topic: str, message_id: str) -> None: ...
+
+
+class Clock(Protocol):
+    def now(self) -> datetime: ...
+
+
+class IdGenerator(Protocol[T_co]):
+    def new(self) -> T_co: ...

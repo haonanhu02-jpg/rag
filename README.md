@@ -1,1 +1,38 @@
-# rag  `rag` 是对 [`haonanhu02-jpg/ragflow-agent`](https://github.com/haonanhu02-jpg/ragflow-agent) 进行绿地重构的新项目。  ## 不可变约束  - 旧仓库只作为能力、行为和兼容性参考，不作为新仓库的代码基底。 - 新仓库具有独立 Git 历史、独立包名和独立目录结构。 - 禁止整体复制旧仓库、保留旧目录后逐步替换，或在生产代码中依赖旧项目。 - 旧代码只有通过逐文件复用评审后才能进入新仓库，并必须登记来源、理由、改造和测试。 - 每项现有能力都必须通过兼容测试重新取得证据；旧项目的“已完成”状态不会自动继承。 - LangChain/LangGraph 只承担其擅长的框架职责，领域语义、安全、数据一致性和检索质量仍由本项目负责。  ## 当前状态  R0 兼容基线与绿地工程已经完成。R1 正在实施领域核心、可信授权、ModelRuntime、基础 PostgreSQL Adapter、进程入口和首批迁移。R1 仍不包含业务 RAG 链路；上传、切块、检索和 问答从 R2 起按目标阶段取得实现和兼容证据。  ## 文档  - [目标架构](docs/architecture.md) - [R0–R10 实施路线图](docs/implementation-roadmap.md) - [兼容测试与代码复用规则](docs/compatibility-and-reuse.md) - [R0 执行记录](docs/phases/r0-compatibility-baseline.md) - [R1 执行记录](docs/phases/r1-domain-foundation.md) - [风险登记](docs/risks.md) - [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md) - [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)  ## 仓库关系  | 仓库 | 角色 | 允许的关系 | |---|---|---| | `haonanhu02-jpg/ragflow-agent` | 旧项目、行为参考、兼容性 oracle | R0 固定 commit；测试只通过公开 Interface 或独立测试驱动调用 | | `haonanhu02-jpg/rag` | 全新实现 | 不依赖旧包；只接收通过复用评审的少量代码 | | `haonanhu02-jpg/lang` | 先前误建的渐进迁移仓库 | 不作为本项目实现来源或阶段状态依据 |
+# rag
+
+`rag` 是对 [`haonanhu02-jpg/ragflow-agent`](https://github.com/haonanhu02-jpg/ragflow-agent)
+进行绿地重构的新项目。
+
+## 不可变约束
+
+- 旧仓库只作为能力、行为和兼容性参考，不作为新仓库的代码基底。
+- 新仓库具有独立 Git 历史、独立包名和独立目录结构。
+- 禁止整体复制旧仓库、保留旧目录后逐步替换，或在生产代码中依赖旧项目。
+- 旧代码只有通过逐文件复用评审后才能进入新仓库，并必须登记来源、理由、改造和测试。
+- 每项现有能力都必须通过兼容测试重新取得证据；旧项目的“已完成”状态不会自动继承。
+- LangChain/LangGraph 只承担其擅长的框架职责，领域语义、安全、数据一致性和检索质量仍由本项目负责。
+
+## 当前状态
+
+R0 兼容基线与绿地工程、R1 领域基础均已完成。R1 已交付可信授权、ModelRuntime、基础
+PostgreSQL Adapter、三个进程入口和首批迁移。当前仍不包含业务 RAG 链路；上传、切块、
+检索和问答从 R2 起按目标阶段取得实现和兼容证据。
+
+## 文档
+
+- [目标架构](docs/architecture.md)
+- [R0–R10 实施路线图](docs/implementation-roadmap.md)
+- [兼容测试与代码复用规则](docs/compatibility-and-reuse.md)
+- [R0 执行记录](docs/phases/r0-compatibility-baseline.md)
+- [R1 执行记录](docs/phases/r1-domain-foundation.md)
+- [风险登记](docs/risks.md)
+- [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md)
+- [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)
+
+## 仓库关系
+
+| 仓库 | 角色 | 允许的关系 |
+|---|---|---|
+| `haonanhu02-jpg/ragflow-agent` | 旧项目、行为参考、兼容性 oracle | R0 固定 commit；测试只通过公开 Interface 或独立测试驱动调用 |
+| `haonanhu02-jpg/rag` | 全新实现 | 不依赖旧包；只接收通过复用评审的少量代码 |
+| `haonanhu02-jpg/lang` | 先前误建的渐进迁移仓库 | 不作为本项目实现来源或阶段状态依据 |

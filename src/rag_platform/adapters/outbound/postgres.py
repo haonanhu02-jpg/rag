@@ -1,1 +1,109 @@
-"""SQLAlchemy/PostgreSQL adapters with mandatory tenant predicates."""  from __future__ import annotations  from contextlib import AbstractContextManager from datetime import datetime from typing import Any  from sqlalchemy import (     Column,     DateTime,     MetaData,     String,     Table,     UniqueConstraint,     create_engine,     select, ) from sqlalchemy.dialects.postgresql import UUID from sqlalchemy.engine import Connection, Engine  from rag_platform.domain.entities import KnowledgeBase from rag_platform.domain.identifiers import KnowledgeBaseId, TenantId  metadata = MetaData()  knowledge_bases = Table(     "knowledge_bases",     metadata,     Column("id", UUID(as_uuid=True), primary_key=True),     Column("tenant_id", UUID(as_uuid=True), nullable=False),     Column("name", String(200), nullable=False),     Column("created_at", DateTime(timezone=True), nullable=False),     UniqueConstraint("tenant_id", "id", name="uq_knowledge_bases_tenant_id_id"), )   def create_postgres_engine(database_url: str) -> Engine:     return create_engine(database_url, pool_pre_ping=True)   class SqlAlchemyTransaction(AbstractContextManager[None]):     def __init__(self, connection: Connection) -> None:         self._connection = connection         self._transaction = connection.begin()      def __enter__(self) -> None:         return None      def commit(self) -> None:         self._transaction.commit()      def rollback(self) -> None:         self._transaction.rollback()      def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:         try:             if exc_type is None:                 self.commit()             else:                 self.rollback()         finally:             self._connection.close()   class SqlAlchemyTransactionManager:     def __init__(self, engine: Engine) -> None:         self._engine = engine      def transaction(self) -> SqlAlchemyTransaction:         return SqlAlchemyTransaction(self._engine.connect())   class PostgresKnowledgeBaseRepository:     def __init__(self, engine: Engine) -> None:         self._engine = engine      def add(self, knowledge_base: KnowledgeBase) -> None:         with self._engine.begin() as connection:             connection.execute(                 knowledge_bases.insert().values(                     id=knowledge_base.id.value,                     tenant_id=knowledge_base.tenant_id.value,                     name=knowledge_base.name,                     created_at=knowledge_base.created_at,                 )             )      def get(         self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId     ) -> KnowledgeBase | None:         statement = select(knowledge_bases).where(             knowledge_bases.c.id == knowledge_base_id.value,             knowledge_bases.c.tenant_id == tenant_id.value,         )         with self._engine.connect() as connection:             row = connection.execute(statement).mappings().one_or_none()         if row is None:             return None         values: dict[str, Any] = dict(row)         created_at = values["created_at"]         if not isinstance(created_at, datetime):             raise TypeError("database returned an invalid created_at")         return KnowledgeBase(             id=KnowledgeBaseId(values["id"]),             tenant_id=TenantId(values["tenant_id"]),             name=str(values["name"]),             created_at=created_at,         )
+"""SQLAlchemy/PostgreSQL adapters with mandatory tenant predicates."""
+
+from __future__ import annotations
+
+from contextlib import AbstractContextManager
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    MetaData,
+    String,
+    Table,
+    UniqueConstraint,
+    create_engine,
+    select,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.engine import Connection, Engine
+
+from rag_platform.domain.entities import KnowledgeBase
+from rag_platform.domain.identifiers import KnowledgeBaseId, TenantId
+
+metadata = MetaData()
+
+knowledge_bases = Table(
+    "knowledge_bases",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", UUID(as_uuid=True), nullable=False),
+    Column("name", String(200), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("tenant_id", "id", name="uq_knowledge_bases_tenant_id_id"),
+)
+
+
+def create_postgres_engine(database_url: str) -> Engine:
+    return create_engine(database_url, pool_pre_ping=True)
+
+
+class SqlAlchemyTransaction(AbstractContextManager[None]):
+    def __init__(self, connection: Connection) -> None:
+        self._connection = connection
+        self._transaction = connection.begin()
+
+    def __enter__(self) -> None:
+        return None
+
+    def commit(self) -> None:
+        self._transaction.commit()
+
+    def rollback(self) -> None:
+        self._transaction.rollback()
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self.rollback()
+        finally:
+            self._connection.close()
+
+
+class SqlAlchemyTransactionManager:
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def transaction(self) -> SqlAlchemyTransaction:
+        return SqlAlchemyTransaction(self._engine.connect())
+
+
+class PostgresKnowledgeBaseRepository:
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def add(self, knowledge_base: KnowledgeBase) -> None:
+        with self._engine.begin() as connection:
+            connection.execute(
+                knowledge_bases.insert().values(
+                    id=knowledge_base.id.value,
+                    tenant_id=knowledge_base.tenant_id.value,
+                    name=knowledge_base.name,
+                    created_at=knowledge_base.created_at,
+                )
+            )
+
+    def get(
+        self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId
+    ) -> KnowledgeBase | None:
+        statement = select(knowledge_bases).where(
+            knowledge_bases.c.id == knowledge_base_id.value,
+            knowledge_bases.c.tenant_id == tenant_id.value,
+        )
+        with self._engine.connect() as connection:
+            row = connection.execute(statement).mappings().one_or_none()
+        if row is None:
+            return None
+        values: dict[str, Any] = dict(row)
+        created_at = values["created_at"]
+        if not isinstance(created_at, datetime):
+            raise TypeError("database returned an invalid created_at")
+        return KnowledgeBase(
+            id=KnowledgeBaseId(values["id"]),
+            tenant_id=TenantId(values["tenant_id"]),
+            name=str(values["name"]),
+            created_at=created_at,
+        )

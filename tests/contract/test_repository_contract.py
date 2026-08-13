@@ -1,1 +1,65 @@
-from __future__ import annotations  import os from collections.abc import Iterator from datetime import UTC, datetime from uuid import UUID  import pytest from sqlalchemy import text  from rag_platform.adapters.outbound.memory import InMemoryKnowledgeBaseRepository from rag_platform.adapters.outbound.postgres import (     PostgresKnowledgeBaseRepository,     create_postgres_engine, ) from rag_platform.domain import KnowledgeBase, KnowledgeBaseId, TenantId from rag_platform.modules.ports import KnowledgeBaseRepository  TENANT_A = TenantId(UUID("00000000-0000-0000-0000-000000000001")) TENANT_B = TenantId(UUID("00000000-0000-0000-0000-000000000002")) KB_ID = KnowledgeBaseId(UUID("00000000-0000-0000-0000-000000000101"))   def assert_repository_contract(repository: KnowledgeBaseRepository) -> None:     knowledge_base = KnowledgeBase(KB_ID, TENANT_A, "engineering", datetime.now(UTC))     repository.add(knowledge_base)      assert repository.get(TENANT_A, KB_ID) == knowledge_base     assert repository.get(TENANT_B, KB_ID) is None   def test_in_memory_repository_contract() -> None:     assert_repository_contract(InMemoryKnowledgeBaseRepository())   @pytest.fixture def postgres_repository() -> Iterator[PostgresKnowledgeBaseRepository]:     database_url = os.environ.get("RAG_TEST_DATABASE_URL")     if database_url is None:         pytest.skip("RAG_TEST_DATABASE_URL is required for the real adapter contract")     engine = create_postgres_engine(database_url)     with engine.begin() as connection:         connection.execute(             text(                 "INSERT INTO tenants (id, name, status, created_at) VALUES "                 "(:a, 'A', 'active', now()), (:b, 'B', 'active', now()) "                 "ON CONFLICT (id) DO NOTHING"             ),             {"a": TENANT_A.value, "b": TENANT_B.value},         )         connection.execute(text("DELETE FROM knowledge_bases WHERE id = :id"), {"id": KB_ID.value})     try:         yield PostgresKnowledgeBaseRepository(engine)     finally:         with engine.begin() as connection:             connection.execute(                 text("DELETE FROM knowledge_bases WHERE id = :id"), {"id": KB_ID.value}             )         engine.dispose()   def test_postgres_repository_contract(     postgres_repository: PostgresKnowledgeBaseRepository, ) -> None:     assert_repository_contract(postgres_repository)
+from __future__ import annotations
+
+import os
+from collections.abc import Iterator
+from datetime import UTC, datetime
+from uuid import UUID
+
+import pytest
+from sqlalchemy import text
+
+from rag_platform.adapters.outbound.memory import InMemoryKnowledgeBaseRepository
+from rag_platform.adapters.outbound.postgres import (
+    PostgresKnowledgeBaseRepository,
+    create_postgres_engine,
+)
+from rag_platform.domain import KnowledgeBase, KnowledgeBaseId, TenantId
+from rag_platform.modules.ports import KnowledgeBaseRepository
+
+TENANT_A = TenantId(UUID("00000000-0000-0000-0000-000000000001"))
+TENANT_B = TenantId(UUID("00000000-0000-0000-0000-000000000002"))
+KB_ID = KnowledgeBaseId(UUID("00000000-0000-0000-0000-000000000101"))
+
+
+def assert_repository_contract(repository: KnowledgeBaseRepository) -> None:
+    knowledge_base = KnowledgeBase(KB_ID, TENANT_A, "engineering", datetime.now(UTC))
+    repository.add(knowledge_base)
+
+    assert repository.get(TENANT_A, KB_ID) == knowledge_base
+    assert repository.get(TENANT_B, KB_ID) is None
+
+
+def test_in_memory_repository_contract() -> None:
+    assert_repository_contract(InMemoryKnowledgeBaseRepository())
+
+
+@pytest.fixture
+def postgres_repository() -> Iterator[PostgresKnowledgeBaseRepository]:
+    database_url = os.environ.get("RAG_TEST_DATABASE_URL")
+    if database_url is None:
+        pytest.skip("RAG_TEST_DATABASE_URL is required for the real adapter contract")
+    engine = create_postgres_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO tenants (id, name, status, created_at) VALUES "
+                "(:a, 'A', 'active', now()), (:b, 'B', 'active', now()) "
+                "ON CONFLICT (id) DO NOTHING"
+            ),
+            {"a": TENANT_A.value, "b": TENANT_B.value},
+        )
+        connection.execute(text("DELETE FROM knowledge_bases WHERE id = :id"), {"id": KB_ID.value})
+    try:
+        yield PostgresKnowledgeBaseRepository(engine)
+    finally:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM knowledge_bases WHERE id = :id"), {"id": KB_ID.value}
+            )
+        engine.dispose()
+
+
+def test_postgres_repository_contract(
+    postgres_repository: PostgresKnowledgeBaseRepository,
+) -> None:
+    assert_repository_contract(postgres_repository)
