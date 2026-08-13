@@ -4,7 +4,7 @@
   "stage": "R2",
   "status": "completed",
   "generated_at": "2026-08-13",
-  "source": {"commit": "pending-r2-implementation-commit"},
+  "source": {"commit": "a82f25c1795d6ac8d12063c15a8c8a1d047b97db"},
   "scope": {
     "business_rag_implemented": true,
     "capability_status": "minimum_subset_implemented",
