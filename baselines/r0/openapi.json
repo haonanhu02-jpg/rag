@@ -1,0 +1,3326 @@
+{
+  "components": {
+    "schemas": {
+      "AgentEvidenceCitation": {
+        "additionalProperties": false,
+        "properties": {
+          "citation_id": {
+            "title": "Citation Id",
+            "type": "string"
+          },
+          "knowledge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnowledgeCitation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Digest"
+          },
+          "source_kind": {
+            "enum": [
+              "knowledge",
+              "sql",
+              "api"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "tool_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Name"
+          }
+        },
+        "required": [
+          "citation_id",
+          "source_kind"
+        ],
+        "title": "AgentEvidenceCitation",
+        "type": "object"
+      },
+      "AgenticAuthorizationSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "knowledge_base_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Knowledge Base Ids",
+            "type": "array"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "roles": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "minLength": 1,
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "user_id",
+          "request_id"
+        ],
+        "title": "AgenticAuthorizationSnapshot",
+        "type": "object"
+      },
+      "AgenticRunResult": {
+        "additionalProperties": false,
+        "properties": {
+          "interrupted": {
+            "default": false,
+            "title": "Interrupted",
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AgenticState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "AgenticRunResult",
+        "type": "object"
+      },
+      "AgenticRunStatus": {
+        "enum": [
+          "completed",
+          "partial_evidence",
+          "no_evidence",
+          "conflicting_evidence",
+          "approval_required",
+          "rejected",
+          "cancelled",
+          "budget_exhausted",
+          "failed"
+        ],
+        "title": "AgenticRunStatus",
+        "type": "string"
+      },
+      "AgenticState": {
+        "additionalProperties": false,
+        "description": "Versioned LangGraph state containing only bounded, checkpoint-safe data.",
+        "properties": {
+          "approval_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Id"
+          },
+          "authorization": {
+            "$ref": "#/components/schemas/AgenticAuthorizationSnapshot"
+          },
+          "budget_limits": {
+            "$ref": "#/components/schemas/BudgetLimits"
+          },
+          "budget_usage": {
+            "$ref": "#/components/schemas/BudgetUsage"
+          },
+          "citations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AgentEvidenceCitation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "current_step": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Current Step",
+            "type": "integer"
+          },
+          "evidence": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "final_answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer"
+          },
+          "final_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgenticRunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hitl_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "iteration": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Iteration",
+            "type": "integer"
+          },
+          "memory_consent": {
+            "default": false,
+            "title": "Memory Consent",
+            "type": "boolean"
+          },
+          "model_provider_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Model Provider Ids",
+            "type": "array"
+          },
+          "pending_tool_invocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ToolInvocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QueryPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "retrieval_trace_ids": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Retrieval Trace Ids",
+            "type": "array"
+          },
+          "route": {
+            "default": "agent",
+            "enum": [
+              "direct_rag",
+              "agent"
+            ],
+            "title": "Route",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "thread_id": {
+            "title": "Thread Id",
+            "type": "string"
+          },
+          "tool_calls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ToolCallSummary"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "thread_id",
+          "request_id",
+          "authorization",
+          "question"
+        ],
+        "title": "AgenticState",
+        "type": "object"
+      },
+      "ApprovalStatus": {
+        "enum": [
+          "approval_required",
+          "approved",
+          "rejected",
+          "expired",
+          "cancelled",
+          "executing",
+          "succeeded",
+          "failed"
+        ],
+        "title": "ApprovalStatus",
+        "type": "string"
+      },
+      "BatchBody": {
+        "additionalProperties": false,
+        "properties": {
+          "concurrency": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concurrency"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LifecycleOperationKind"
+          },
+          "knowledge_base_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Knowledge Base Id",
+            "type": "string"
+          },
+          "operation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Operation Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "knowledge_base_id",
+          "kind",
+          "operation_ids"
+        ],
+        "title": "BatchBody",
+        "type": "object"
+      },
+      "Body_update_document_v1_documents__document_id__content_put": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_update_document_v1_documents__document_id__content_put",
+        "type": "object"
+      },
+      "Body_upload_document_v1_knowledge_bases__knowledge_base_id__documents_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_v1_knowledge_bases__knowledge_base_id__documents_post",
+        "type": "object"
+      },
+      "BudgetLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "finalization_token_reserve": {
+            "default": 1500,
+            "minimum": 0.0,
+            "title": "Finalization Token Reserve",
+            "type": "integer"
+          },
+          "max_active_runtime_seconds": {
+            "default": 120,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Active Runtime Seconds",
+            "type": "number"
+          },
+          "max_agent_iterations": {
+            "default": 8,
+            "minimum": 1.0,
+            "title": "Max Agent Iterations",
+            "type": "integer"
+          },
+          "max_generated_tokens": {
+            "default": 8000,
+            "minimum": 1.0,
+            "title": "Max Generated Tokens",
+            "type": "integer"
+          },
+          "max_known_cost_usd": {
+            "default": 0.5,
+            "minimum": 0.0,
+            "title": "Max Known Cost Usd",
+            "type": "number"
+          },
+          "max_model_calls": {
+            "default": 6,
+            "minimum": 1.0,
+            "title": "Max Model Calls",
+            "type": "integer"
+          },
+          "max_retrieval_rounds": {
+            "default": 3,
+            "minimum": 1.0,
+            "title": "Max Retrieval Rounds",
+            "type": "integer"
+          },
+          "max_tool_attempts": {
+            "default": 10,
+            "minimum": 1.0,
+            "title": "Max Tool Attempts",
+            "type": "integer"
+          },
+          "max_total_tokens": {
+            "default": 50000,
+            "minimum": 1.0,
+            "title": "Max Total Tokens",
+            "type": "integer"
+          },
+          "model_input_cost_per_million_tokens_usd": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Input Cost Per Million Tokens Usd"
+          },
+          "model_output_cost_per_million_tokens_usd": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Output Cost Per Million Tokens Usd"
+          }
+        },
+        "title": "BudgetLimits",
+        "type": "object"
+      },
+      "BudgetUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "active_runtime_seconds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Active Runtime Seconds",
+            "type": "number"
+          },
+          "agent_iterations": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Agent Iterations",
+            "type": "integer"
+          },
+          "cost_status": {
+            "$ref": "#/components/schemas/CostStatus",
+            "default": "unknown"
+          },
+          "generated_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Generated Tokens",
+            "type": "integer"
+          },
+          "known_cost_usd": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Known Cost Usd",
+            "type": "number"
+          },
+          "model_calls": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Model Calls",
+            "type": "integer"
+          },
+          "retrieval_rounds": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Retrieval Rounds",
+            "type": "integer"
+          },
+          "tool_attempts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Tool Attempts",
+            "type": "integer"
+          },
+          "total_tokens": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Total Tokens",
+            "type": "integer"
+          }
+        },
+        "title": "BudgetUsage",
+        "type": "object"
+      },
+      "CostStatus": {
+        "enum": [
+          "known",
+          "unknown",
+          "local"
+        ],
+        "title": "CostStatus",
+        "type": "string"
+      },
+      "CreateKnowledgeBaseBody": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateKnowledgeBaseBody",
+        "type": "object"
+      },
+      "EvidenceItem": {
+        "additionalProperties": false,
+        "properties": {
+          "active_version": {
+            "default": true,
+            "title": "Active Version",
+            "type": "boolean"
+          },
+          "authorized": {
+            "default": true,
+            "title": "Authorized",
+            "type": "boolean"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentEvidenceCitation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "maxLength": 2000,
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "fact_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Key"
+          },
+          "injection_detected": {
+            "default": false,
+            "title": "Injection Detected",
+            "type": "boolean"
+          },
+          "knowledge_base_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base Id"
+          },
+          "normalized_score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Normalized Score",
+            "type": "number"
+          },
+          "source_kind": {
+            "enum": [
+              "knowledge",
+              "sql",
+              "api"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "stance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stance"
+          },
+          "step_id": {
+            "title": "Step Id",
+            "type": "string"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "step_id",
+          "source_kind",
+          "tenant_id",
+          "excerpt",
+          "normalized_score"
+        ],
+        "title": "EvidenceItem",
+        "type": "object"
+      },
+      "FailureClass": {
+        "enum": [
+          "transient",
+          "concurrency",
+          "permanent",
+          "cancelled",
+          "unknown"
+        ],
+        "title": "FailureClass",
+        "type": "string"
+      },
+      "FilterGroupOperator": {
+        "description": "Boolean operators supported by the backend-neutral Filter AST.",
+        "enum": [
+          "and",
+          "or",
+          "not"
+        ],
+        "title": "FilterGroupOperator",
+        "type": "string"
+      },
+      "FilterOperator": {
+        "description": "Small backend-independent filter vocabulary.",
+        "enum": [
+          "equals",
+          "in",
+          "gte",
+          "lte"
+        ],
+        "title": "FilterOperator",
+        "type": "string"
+      },
+      "FilterScalar": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "FixedRagBody": {
+        "additionalProperties": false,
+        "properties": {
+          "filter_expression": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataFilterGroup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "filters": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MetadataFilter"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "history": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 16,
+            "title": "History",
+            "type": "array"
+          },
+          "knowledge_base_ids": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Knowledge Base Ids",
+            "type": "array"
+          },
+          "question": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "target_languages": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Target Languages",
+            "type": "array"
+          },
+          "top_k": {
+            "default": 20,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "type": "integer"
+          },
+          "top_n": {
+            "default": 5,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Top N",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "question",
+          "knowledge_base_ids"
+        ],
+        "title": "FixedRagBody",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IngestionError": {
+        "additionalProperties": false,
+        "description": "Stable failure recorded in the database, not only in queue metadata.",
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/FailureClass",
+            "default": "unknown"
+          },
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "IngestionError",
+        "type": "object"
+      },
+      "IngestionJob": {
+        "additionalProperties": false,
+        "description": "Business record for building one immutable document version.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "document_id": {
+            "minLength": 1,
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_id": {
+            "minLength": 1,
+            "title": "Document Version Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IngestionError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "knowledge_base_id": {
+            "minLength": 1,
+            "title": "Knowledge Base Id",
+            "type": "string"
+          },
+          "operation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Id"
+          },
+          "progress": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "type": "number"
+          },
+          "requested_by": {
+            "minLength": 1,
+            "title": "Requested By",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IngestionStatus",
+            "default": "pending"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "trace_id": {
+            "minLength": 1,
+            "title": "Trace Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "knowledge_base_id",
+          "document_id",
+          "document_version_id",
+          "requested_by",
+          "idempotency_key",
+          "trace_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IngestionJob",
+        "type": "object"
+      },
+      "IngestionStatus": {
+        "description": "Shared lifecycle for an ingestion job or stage task.",
+        "enum": [
+          "pending",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "IngestionStatus",
+        "type": "string"
+      },
+      "KnowledgeBase": {
+        "additionalProperties": false,
+        "description": "Tenant-scoped knowledge-base aggregate.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_id": {
+            "minLength": 1,
+            "title": "Owner Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeBaseStatus",
+            "default": "active"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility",
+            "default": "private"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "owner_id",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "KnowledgeBase",
+        "type": "object"
+      },
+      "KnowledgeBaseStatus": {
+        "description": "Minimal lifecycle needed before document lifecycle implementation.",
+        "enum": [
+          "active",
+          "archived"
+        ],
+        "title": "KnowledgeBaseStatus",
+        "type": "string"
+      },
+      "KnowledgeCitation": {
+        "additionalProperties": false,
+        "description": "Version-bound citation contract copied at the Tool boundary.",
+        "properties": {
+          "bounding_box": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bounding Box"
+          },
+          "chunk_id": {
+            "title": "Chunk Id",
+            "type": "string"
+          },
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_id": {
+            "title": "Document Version Id",
+            "type": "string"
+          },
+          "knowledge_base_id": {
+            "title": "Knowledge Base Id",
+            "type": "string"
+          },
+          "media_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media Kind"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "quote": {
+            "title": "Quote",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 2,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "source_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Uri"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "time_end_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time End Seconds"
+          },
+          "time_start_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Start Seconds"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "knowledge_base_id",
+          "document_id",
+          "document_version_id",
+          "chunk_id",
+          "quote"
+        ],
+        "title": "KnowledgeCitation",
+        "type": "object"
+      },
+      "LifecycleBatch": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "concurrency": {
+            "default": 2,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "failed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LifecycleOperationKind"
+          },
+          "knowledge_base_id": {
+            "minLength": 1,
+            "title": "Knowledge Base Id",
+            "type": "string"
+          },
+          "operation_ids": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Operation Ids",
+            "type": "array"
+          },
+          "requested_by": {
+            "minLength": 1,
+            "title": "Requested By",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LifecycleBatchStatus",
+            "default": "pending"
+          },
+          "succeeded": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Succeeded",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "knowledge_base_id",
+          "kind",
+          "requested_by",
+          "idempotency_key",
+          "operation_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LifecycleBatch",
+        "type": "object"
+      },
+      "LifecycleBatchStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "succeeded",
+          "partial_success",
+          "failed",
+          "cancel_requested",
+          "cancelled"
+        ],
+        "title": "LifecycleBatchStatus",
+        "type": "string"
+      },
+      "LifecycleError": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "$ref": "#/components/schemas/FailureClass"
+          },
+          "code": {
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "classification",
+          "code",
+          "message",
+          "retryable"
+        ],
+        "title": "LifecycleError",
+        "type": "object"
+      },
+      "LifecycleOperation": {
+        "additionalProperties": false,
+        "description": "PostgreSQL-authoritative record for one cross-store state transition.",
+        "properties": {
+          "actor_id": {
+            "minLength": 1,
+            "title": "Actor Id",
+            "type": "string"
+          },
+          "attempts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_step": {
+            "$ref": "#/components/schemas/LifecycleStep",
+            "default": "register"
+          },
+          "document_id": {
+            "minLength": 1,
+            "title": "Document Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expected_document_revision": {
+            "minimum": 0.0,
+            "title": "Expected Document Revision",
+            "type": "integer"
+          },
+          "fencing_token": {
+            "minimum": 1.0,
+            "title": "Fencing Token",
+            "type": "integer"
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "index_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Version Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/LifecycleOperationKind"
+          },
+          "knowledge_base_id": {
+            "minLength": 1,
+            "title": "Knowledge Base Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "previous_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Version Id"
+          },
+          "progress": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "type": "number"
+          },
+          "purge_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purge After"
+          },
+          "reason": {
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "request_id": {
+            "minLength": 1,
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LifecycleOperationStatus",
+            "default": "pending"
+          },
+          "steps": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LifecycleStepState"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "tenant_id": {
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version_id": {
+            "minLength": 1,
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "knowledge_base_id",
+          "document_id",
+          "version_id",
+          "kind",
+          "idempotency_key",
+          "actor_id",
+          "reason",
+          "request_id",
+          "expected_document_revision",
+          "fencing_token",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LifecycleOperation",
+        "type": "object"
+      },
+      "LifecycleOperationKind": {
+        "enum": [
+          "update",
+          "reparse",
+          "rebuild",
+          "activate",
+          "rollback",
+          "delete",
+          "restore",
+          "purge",
+          "reconcile"
+        ],
+        "title": "LifecycleOperationKind",
+        "type": "string"
+      },
+      "LifecycleOperationStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "waiting_retry",
+          "cancel_requested",
+          "cancelled",
+          "succeeded",
+          "failed",
+          "dead_letter"
+        ],
+        "title": "LifecycleOperationStatus",
+        "type": "string"
+      },
+      "LifecycleReasonBody": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "LifecycleReasonBody",
+        "type": "object"
+      },
+      "LifecycleStep": {
+        "enum": [
+          "register",
+          "store_object",
+          "parse",
+          "chunk",
+          "embed",
+          "write_index",
+          "validate",
+          "promote",
+          "activate",
+          "retire_previous",
+          "mark_invisible",
+          "clean_index",
+          "clean_objects",
+          "complete"
+        ],
+        "title": "LifecycleStep",
+        "type": "string"
+      },
+      "LifecycleStepState": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecycleError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LifecycleStepStatus",
+            "default": "pending"
+          },
+          "step": {
+            "$ref": "#/components/schemas/LifecycleStep"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "LifecycleStepState",
+        "type": "object"
+      },
+      "LifecycleStepStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "succeeded",
+          "failed",
+          "skipped"
+        ],
+        "title": "LifecycleStepStatus",
+        "type": "string"
+      },
+      "LongTermMemory": {
+        "additionalProperties": false,
+        "properties": {
+          "consent_version": {
+            "title": "Consent Version",
+            "type": "string"
+          },
+          "consented_at": {
+            "format": "date-time",
+            "title": "Consented At",
+            "type": "string"
+          },
+          "content": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "memory_id": {
+            "title": "Memory Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "memory_id",
+          "tenant_id",
+          "user_id",
+          "content",
+          "source",
+          "consent_version",
+          "consented_at",
+          "created_at",
+          "expires_at"
+        ],
+        "title": "LongTermMemory",
+        "type": "object"
+      },
+      "MemoryConsent": {
+        "additionalProperties": false,
+        "properties": {
+          "consent_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Version"
+          },
+          "consented_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consented At"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "user_id"
+        ],
+        "title": "MemoryConsent",
+        "type": "object"
+      },
+      "MemoryConsentBody": {
+        "additionalProperties": false,
+        "properties": {
+          "consent_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Consent Version",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "consent_version"
+        ],
+        "title": "MemoryConsentBody",
+        "type": "object"
+      },
+      "MetadataField": {
+        "description": "Portable metadata fields allowed before a search backend is selected.",
+        "enum": [
+          "document_id",
+          "document_version_id",
+          "media_type",
+          "language",
+          "created_at",
+          "heading_path",
+          "contains_table",
+          "contains_image",
+          "chunk_strategy_id"
+        ],
+        "title": "MetadataField",
+        "type": "string"
+      },
+      "MetadataFilter": {
+        "additionalProperties": false,
+        "description": "Typed filter expression; adapters translate it to their own DSL.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/MetadataField"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/FilterOperator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FilterScalar"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FilterScalar"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field",
+          "operator",
+          "value"
+        ],
+        "title": "MetadataFilter",
+        "type": "object"
+      },
+      "MetadataFilterGroup": {
+        "additionalProperties": false,
+        "description": "Recursive, validated metadata expression compiled only by adapters.",
+        "properties": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MetadataFilter"
+                },
+                {
+                  "$ref": "#/components/schemas/MetadataFilterGroup"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "operator": {
+            "$ref": "#/components/schemas/FilterGroupOperator",
+            "default": "and"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MetadataFilterGroup",
+        "type": "object"
+      },
+      "PlanStep": {
+        "additionalProperties": false,
+        "properties": {
+          "critical": {
+            "default": true,
+            "title": "Critical",
+            "type": "boolean"
+          },
+          "depends_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "preferred_tool": {
+            "default": "knowledge_base",
+            "title": "Preferred Tool",
+            "type": "string"
+          },
+          "question": {
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "step_id": {
+            "minLength": 1,
+            "title": "Step Id",
+            "type": "string"
+          },
+          "tool_arguments": {
+            "additionalProperties": true,
+            "title": "Tool Arguments",
+            "type": "object"
+          },
+          "tool_version": {
+            "default": "1",
+            "title": "Tool Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step_id",
+          "question"
+        ],
+        "title": "PlanStep",
+        "type": "object"
+      },
+      "QueryPlan": {
+        "additionalProperties": false,
+        "properties": {
+          "is_simple": {
+            "title": "Is Simple",
+            "type": "boolean"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PlanStep"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "is_simple",
+          "steps"
+        ],
+        "title": "QueryPlan",
+        "type": "object"
+      },
+      "RememberBody": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Content",
+            "type": "string"
+          },
+          "explicit_user_request": {
+            "const": true,
+            "title": "Explicit User Request",
+            "type": "boolean"
+          },
+          "source": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "source",
+          "explicit_user_request"
+        ],
+        "title": "RememberBody",
+        "type": "object"
+      },
+      "ResumeAgenticRunBody": {
+        "additionalProperties": false,
+        "properties": {
+          "approval_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Approval Id",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "approve",
+              "reject",
+              "cancel"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "thread_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Thread Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id",
+          "approval_id",
+          "decision"
+        ],
+        "title": "ResumeAgenticRunBody",
+        "type": "object"
+      },
+      "RollbackBody": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_version_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Target Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "target_version_id"
+        ],
+        "title": "RollbackBody",
+        "type": "object"
+      },
+      "StartAgenticRunBody": {
+        "additionalProperties": false,
+        "properties": {
+          "knowledge_base_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Knowledge Base Ids",
+            "type": "array"
+          },
+          "question": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          }
+        },
+        "required": [
+          "question",
+          "knowledge_base_ids"
+        ],
+        "title": "StartAgenticRunBody",
+        "type": "object"
+      },
+      "ToolCallSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "argument_digest": {
+            "title": "Argument Digest",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "output_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Digest"
+          },
+          "retrieval_trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Trace Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_call_id": {
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "tool_version": {
+            "title": "Tool Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "tool_version",
+          "argument_digest",
+          "status"
+        ],
+        "title": "ToolCallSummary",
+        "type": "object"
+      },
+      "ToolInvocation": {
+        "additionalProperties": false,
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "business_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Scope"
+          },
+          "tool_call_id": {
+            "minLength": 1,
+            "title": "Tool Call Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "minLength": 1,
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "tool_version": {
+            "minLength": 1,
+            "title": "Tool Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool_call_id",
+          "tool_name",
+          "tool_version"
+        ],
+        "title": "ToolInvocation",
+        "type": "object"
+      },
+      "UploadAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "document_version_id": {
+            "title": "Document Version Id",
+            "type": "string"
+          },
+          "duplicate": {
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "document_id",
+          "document_version_id",
+          "status",
+          "duplicate"
+        ],
+        "title": "UploadAccepted",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Visibility": {
+        "description": "Supported Phase 03 resource visibility values.",
+        "enum": [
+          "private",
+          "tenant"
+        ],
+        "title": "Visibility",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "title": "ragflow-agent",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Live Health Live Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/agentic-rag/memory": {
+      "get": {
+        "operationId": "list_memory_v1_agentic_rag_memory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LongTermMemory"
+                  },
+                  "title": "Response List Memory V1 Agentic Rag Memory Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Memory",
+        "tags": [
+          "agentic-rag"
+        ]
+      },
+      "post": {
+        "operationId": "remember_v1_agentic_rag_memory_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RememberBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LongTermMemory"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remember",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/agentic-rag/memory/consent": {
+      "put": {
+        "operationId": "set_memory_consent_v1_agentic_rag_memory_consent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryConsentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryConsent"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Memory Consent",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/agentic-rag/memory/{memory_id}": {
+      "delete": {
+        "operationId": "delete_memory_v1_agentic_rag_memory__memory_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "memory_id",
+            "required": true,
+            "schema": {
+              "title": "Memory Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Memory",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/agentic-rag/runs": {
+      "post": {
+        "operationId": "start_run_v1_agentic_rag_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartAgenticRunBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgenticRunResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Run",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/agentic-rag/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_v1_agentic_rag_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "thread_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Thread Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgenticRunResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/agentic-rag/runs/{run_id}/resume": {
+      "post": {
+        "operationId": "resume_run_v1_agentic_rag_runs__run_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeAgenticRunBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgenticRunResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume Run",
+        "tags": [
+          "agentic-rag"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}": {
+      "delete": {
+        "operationId": "delete_document_v1_documents__document_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleReasonBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}/content": {
+      "put": {
+        "operationId": "update_document_v1_documents__document_id__content_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Lifecycle-Reason",
+            "required": true,
+            "schema": {
+              "title": "X-Lifecycle-Reason",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_document_v1_documents__document_id__content_put"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}/reparse": {
+      "post": {
+        "operationId": "reparse_document_v1_documents__document_id__reparse_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleReasonBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reparse Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}/restore": {
+      "post": {
+        "operationId": "restore_document_v1_documents__document_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecycleReasonBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/documents/{document_id}/rollback": {
+      "post": {
+        "operationId": "rollback_document_v1_documents__document_id__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollbackBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/ingestion-jobs/{job_id}": {
+      "get": {
+        "operationId": "get_ingestion_job_v1_ingestion_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngestionJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ingestion Job",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/knowledge-bases": {
+      "post": {
+        "operationId": "create_knowledge_base_v1_knowledge_bases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateKnowledgeBaseBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBase"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Knowledge Base",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/knowledge-bases/{knowledge_base_id}/documents": {
+      "post": {
+        "operationId": "upload_document_v1_knowledge_bases__knowledge_base_id__documents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "knowledge_base_id",
+            "required": true,
+            "schema": {
+              "title": "Knowledge Base Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_v1_knowledge_bases__knowledge_base_id__documents_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Document",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/lifecycle-batches": {
+      "post": {
+        "operationId": "create_lifecycle_batch_v1_lifecycle_batches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleBatch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Lifecycle Batch",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/lifecycle-batches/{batch_id}": {
+      "get": {
+        "operationId": "get_lifecycle_batch_v1_lifecycle_batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleBatch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Lifecycle Batch",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/lifecycle-operations/{operation_id}": {
+      "get": {
+        "operationId": "get_lifecycle_operation_v1_lifecycle_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Lifecycle Operation",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/lifecycle-operations/{operation_id}/cancel": {
+      "post": {
+        "operationId": "cancel_lifecycle_operation_v1_lifecycle_operations__operation_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOperation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Lifecycle Operation",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/rag/query": {
+      "post": {
+        "operationId": "fixed_rag_v1_rag_query_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FixedRagBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Fixed Rag V1 Rag Query Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fixed Rag",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/v1/retrieval-traces/{trace_id}": {
+      "get": {
+        "operationId": "get_retrieval_trace_v1_retrieval_traces__trace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Retrieval Trace V1 Retrieval Traces  Trace Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Retrieval Trace",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    }
+  }
+}

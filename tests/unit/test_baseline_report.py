@@ -1,0 +1,49 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from scripts.check_r0_baseline import (
+    BaselineError,
+    build_report,
+    normalized_text_hash,
+    verify_frozen_report,
+)
+
+
+def test_report_truthfully_marks_all_new_capabilities_unimplemented() -> None:
+    report = build_report(Path.cwd())
+
+    assert report["status"] == "completed"
+    assert report["capabilities"]["count"] == 43
+    assert report["capabilities"]["new_status_counts"] == {
+        "not_implemented_in_new_repo": 43
+    }
+    assert report["scenarios"]["count"] == 43
+    assert report["greenfield"]["legacy_production_dependency"] is False
+
+
+def test_normalized_text_hash_is_line_ending_independent(tmp_path: Path) -> None:
+    lf = tmp_path / "lf.md"
+    crlf = tmp_path / "crlf.md"
+    lf.write_bytes("标题\n内容\n".encode())
+    crlf.write_bytes("标题\r\n内容\r\n".encode())
+
+    assert normalized_text_hash(lf) == normalized_text_hash(crlf)
+
+
+def test_frozen_report_allows_source_metadata_to_change() -> None:
+    report = build_report(Path.cwd())
+    frozen = dict(report)
+    frozen["source"] = {"commit": "implementation-commit", "branch": "main"}
+
+    verify_frozen_report(report, frozen)
+
+
+def test_frozen_report_rejects_contract_drift() -> None:
+    report = build_report(Path.cwd())
+    frozen = dict(report)
+    frozen["contracts"] = {"file_hash_semantics": "wrong"}
+
+    with pytest.raises(BaselineError, match="frozen report drift in contracts"):
+        verify_frozen_report(report, frozen)

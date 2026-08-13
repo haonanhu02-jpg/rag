@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/haonanhu02-jpg/ragflow-agent",
+  "commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "artifacts": [
+    {
+      "path": "pyproject.toml",
+      "git_object_type": "blob",
+      "git_object_sha": "dd42d397d69ff886b1d05d8ed6049f9976b6c32e",
+      "role": "runtime_and_quality_contract"
+    },
+    {
+      "path": "docs/02-ragflow-capability-matrix.md",
+      "git_object_type": "blob",
+      "git_object_sha": "1540d130342e4c4a137a5035c3489f10d55fc59b",
+      "role": "capability_evidence"
+    },
+    {
+      "path": "tests",
+      "git_object_type": "tree",
+      "git_object_sha": "2be126eaccee7004eefc6ad67d3b8838c21facd6",
+      "role": "behavior_test_inventory"
+    },
+    {
+      "path": "tests/golden",
+      "git_object_type": "tree",
+      "git_object_sha": "d8db635148688dbf616091185c3c0234789b787d",
+      "role": "golden_parsing_evidence"
+    },
+    {
+      "path": "tests/evaluation",
+      "git_object_type": "tree",
+      "git_object_sha": "67ef356145a83c91846059d2d0e6803cdba9ec6e",
+      "role": "retrieval_answer_citation_agent_evidence"
+    },
+    {
+      "path": "reports",
+      "git_object_type": "tree",
+      "git_object_sha": "c13aa584faf2fc2fdefbaae6eb716da4e4f26ad6",
+      "role": "historical_machine_reports"
+    }
+  ],
+  "captured_contracts": [
+    {
+      "path": "baselines/r0/openapi.json",
+      "kind": "public_openapi",
+      "path_count": 22,
+      "normalized_sha256": "3b8a5db4ae03c889cc87c4c535e3aaaf1bc5801bfec1e437a3ce95219eb2e459"
+    }
+  ],
+  "data_policy": "Reference artifacts remain in the old repository; the new repository stores hashes and public-contract snapshots only."
+}

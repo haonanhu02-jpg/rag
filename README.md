@@ -14,13 +14,16 @@
 
 ## 当前状态
 
-当前仅建立最新版架构和实施方案，尚未宣称 R0 或任何业务阶段完成。
+R0 兼容基线与绿地工程已经完成，R1 尚未开始。当前仍未实现任何业务 RAG 能力，不能宣称
+能力兼容；每项能力将在目标阶段重新取得实现和兼容证据。
 
 ## 文档
 
 - [目标架构](docs/architecture.md)
 - [R0–R10 实施路线图](docs/implementation-roadmap.md)
 - [兼容测试与代码复用规则](docs/compatibility-and-reuse.md)
+- [R0 执行记录](docs/phases/r0-compatibility-baseline.md)
+- [风险登记](docs/risks.md)
 - [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md)
 - [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)
 
