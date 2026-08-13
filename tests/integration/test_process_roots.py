@@ -1,1 +1,25 @@
-from __future__ import annotations  from fastapi.routing import APIRoute  from rag_platform.bootstrap.api import create_app from rag_platform.bootstrap.api import main as api_main from rag_platform.bootstrap.maintainer import main as maintainer_main from rag_platform.bootstrap.worker import main as worker_main   def test_three_process_roots_pass_check_mode(capsys: object) -> None:     assert api_main(["--check"]) == 0     assert worker_main(["--check"]) == 0     assert maintainer_main(["--check"]) == 0   def test_api_health_endpoints() -> None:     routes = {         route.path: route.endpoint         for route in create_app().routes         if isinstance(route, APIRoute)     }      assert routes["/health/live"]() == {"status": "ok", "process": "api"}     assert routes["/health/ready"]() == {"status": "ready", "database": "configured"}
+from __future__ import annotations
+
+from fastapi.routing import APIRoute
+
+from rag_platform.bootstrap.api import create_app
+from rag_platform.bootstrap.api import main as api_main
+from rag_platform.bootstrap.maintainer import main as maintainer_main
+from rag_platform.bootstrap.worker import main as worker_main
+
+
+def test_three_process_roots_pass_check_mode(capsys: object) -> None:
+    assert api_main(["--check"]) == 0
+    assert worker_main(["--check"]) == 0
+    assert maintainer_main(["--check"]) == 0
+
+
+def test_api_health_endpoints() -> None:
+    routes = {
+        route.path: route.endpoint
+        for route in create_app().routes
+        if isinstance(route, APIRoute)
+    }
+
+    assert routes["/health/live"]() == {"status": "ok", "process": "api"}
+    assert routes["/health/ready"]() == {"status": "ready", "database": "configured"}
