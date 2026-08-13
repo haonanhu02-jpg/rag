@@ -1,2 +1,1 @@
-"""Deep business modules (introduced from R1 onward)."""
-"""Framework-free deep-module interfaces."""
+"""Deep business modules (introduced from R1 onward).""" """Framework-free deep-module interfaces."""
