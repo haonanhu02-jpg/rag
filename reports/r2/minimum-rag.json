@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "report_id": "rag-greenfield-r2-minimum-rag",
+  "stage": "R2",
+  "status": "completed",
+  "generated_at": "2026-08-13",
+  "source": {"commit": "a82f25c1795d6ac8d12063c15a8c8a1d047b97db"},
+  "scope": {
+    "business_rag_implemented": true,
+    "capability_status": "minimum_subset_implemented",
+    "capabilities": ["CAP-03", "CAP-04", "CAP-08", "CAP-10", "CAP-16", "CAP-21", "CAP-22", "CAP-23", "CAP-27", "CAP-38"],
+    "remaining_capabilities": "not_implemented_in_new_repo",
+    "document_media_types": ["text/plain", "text/markdown"],
+    "chunk_methods": ["general"],
+    "retrieval_channels": ["vector"],
+    "ingestion_graph_nodes": ["load", "compile", "embed", "stage", "validate", "publish"]
+  },
+  "evidence": {
+    "legacy_behavior_observations": 4,
+    "fake_model_e2e": true,
+    "postgres_pgvector_e2e": true,
+    "cross_tenant_negative": true,
+    "wrong_kb_negative": true,
+    "unpublished_negative": true,
+    "deleted_negative": true,
+    "stable_chunk_and_version_deduplication": true,
+    "migration_round_trip": true,
+    "source_reuse": "none"
+  },
+  "migration_head": "20260813_0002",
+  "next_stage": "R3"
+}

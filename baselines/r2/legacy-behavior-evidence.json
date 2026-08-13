@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "reference_commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "observations": [
+    {
+      "behavior": "minimum_rag_upload_ingest_query_citation_and_tenant_isolation",
+      "path": "tests/e2e/minimum_rag/test_flow.py",
+      "git_blob": "bcdae0ff6c1288aa2664d941203e419047aa129c"
+    },
+    {
+      "behavior": "upload_api_is_idempotent_and_requires_trusted_identity",
+      "path": "tests/integration/api/test_document_upload.py",
+      "git_blob": "e92f7319020ae75ba1df159c778cfd8c454263a5"
+    },
+    {
+      "behavior": "no_evidence_skips_model_and_returns_stable_answer",
+      "path": "tests/unit/rag/test_answer.py",
+      "git_blob": "c10a2dbe043dee238b809c2110343959cbdc8f37"
+    },
+    {
+      "behavior": "citations_are_version_bound",
+      "path": "tests/unit/rag/test_citations.py",
+      "git_blob": "fe0c0bdd3d976df872a7b1b4b362d3e20b5a5d57"
+    }
+  ],
+  "new_system_tests": [
+    "tests/e2e/test_r2_minimum_rag.py",
+    "tests/unit/test_document_compiler.py",
+    "tests/unit/test_file_object_store.py"
+  ],
+  "source_reuse": "none"
+}

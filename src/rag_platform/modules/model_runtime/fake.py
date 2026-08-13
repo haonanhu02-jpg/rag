@@ -21,8 +21,16 @@ from rag_platform.modules.model_runtime.contracts import (
 
 
 class FakeModelRuntime:
-    def __init__(self, registrations: tuple[ModelRegistration, ...]) -> None:
+    def __init__(
+        self,
+        registrations: tuple[ModelRegistration, ...],
+        *,
+        chat_response: str | None = None,
+    ) -> None:
         self._registrations = {registration.id: registration for registration in registrations}
+        self._chat_response = chat_response
+        self.chat_requests: list[ChatRequest] = []
+        self.embedding_requests: list[EmbeddingRequest] = []
 
     def _require(self, model_id: str, kind: ModelKind) -> ModelRegistration:
         registration = self._registrations.get(model_id)
@@ -32,7 +40,8 @@ class FakeModelRuntime:
 
     def chat(self, request: ChatRequest) -> ChatResult:
         self._require(request.model_id, ModelKind.CHAT)
-        text = request.messages[-1].content
+        self.chat_requests.append(request)
+        text = self._chat_response or request.messages[-1].content
         structured: dict[str, JsonValue] | None = None
         if request.structured_schema is not None:
             structured = {"text": text}
@@ -48,6 +57,7 @@ class FakeModelRuntime:
 
     def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
         self._require(request.model_id, ModelKind.EMBEDDING)
+        self.embedding_requests.append(request)
         vectors = tuple(self._vector(text) for text in request.texts)
         return EmbeddingResult(
             request.model_id,

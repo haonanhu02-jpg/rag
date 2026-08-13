@@ -15,6 +15,8 @@ class Settings:
     environment: str
     database_url: str
     log_level: str
+    object_store_root: str = ".rag-objects"
+    max_upload_bytes: int = 10 * 1024 * 1024
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -23,7 +25,18 @@ class Settings:
             "RAG_DATABASE_URL", "postgresql+psycopg://rag:rag@localhost:5432/rag"
         )
         log_level = os.environ.get("RAG_LOG_LEVEL", "INFO").upper()
-        settings = cls(environment, database_url, log_level)
+        object_store_root = os.environ.get("RAG_OBJECT_STORE_ROOT", ".rag-objects")
+        try:
+            max_upload_bytes = int(os.environ.get("RAG_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+        except ValueError as exc:
+            raise ConfigurationError("RAG_MAX_UPLOAD_BYTES must be an integer") from exc
+        settings = cls(
+            environment,
+            database_url,
+            log_level,
+            object_store_root,
+            max_upload_bytes,
+        )
         settings.validate()
         return settings
 
@@ -34,3 +47,7 @@ class Settings:
             raise ConfigurationError("RAG_DATABASE_URL must use PostgreSQL")
         if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             raise ConfigurationError("RAG_LOG_LEVEL is invalid")
+        if not self.object_store_root.strip():
+            raise ConfigurationError("RAG_OBJECT_STORE_ROOT must not be empty")
+        if not 1 <= self.max_upload_bytes <= 100 * 1024 * 1024:
+            raise ConfigurationError("RAG_MAX_UPLOAD_BYTES is outside the safe range")

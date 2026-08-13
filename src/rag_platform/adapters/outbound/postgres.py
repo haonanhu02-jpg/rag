@@ -1,37 +1,201 @@
-"""SQLAlchemy/PostgreSQL adapters with mandatory tenant predicates."""
+"""PostgreSQL authority and pgvector adapters with mandatory tenant predicates."""
 
 from __future__ import annotations
 
+import hashlib
 from contextlib import AbstractContextManager
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
+from uuid import UUID, uuid4, uuid5
 
+from pgvector.sqlalchemy import VECTOR
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     Column,
     DateTime,
+    Float,
+    Integer,
     MetaData,
     String,
     Table,
+    Text,
     UniqueConstraint,
     create_engine,
+    delete,
+    func,
+    insert,
     select,
+    update,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine
 
-from rag_platform.domain.entities import KnowledgeBase
-from rag_platform.domain.identifiers import KnowledgeBaseId, TenantId
+from rag_platform.domain.authorization import AuthorizationContext
+from rag_platform.domain.entities import KnowledgeBase, VersionStatus, WorkStatus
+from rag_platform.domain.identifiers import (
+    ActorId,
+    ChunkId,
+    DocumentId,
+    DocumentVersionId,
+    IndexVersionId,
+    JobId,
+    KnowledgeBaseId,
+    TenantId,
+    TraceId,
+)
+from rag_platform.domain.policies import CorePolicies, ResourceNotFound
+from rag_platform.modules.knowledge.contracts import (
+    CompiledDocument,
+    IdempotencyConflict,
+    IngestionJobRecord,
+    IngestionSource,
+    KnowledgeBaseRecord,
+    RetrievalTraceRecord,
+    SearchHit,
+    StagedGeneration,
+    UploadSubmission,
+)
 
 metadata = MetaData()
+_STABLE_NAMESPACE = UUID("c4e188ff-9b5e-52ba-94e7-0ef263d4c715")
 
+tenants = Table(
+    "tenants",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("name", String(200), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
 knowledge_bases = Table(
     "knowledge_bases",
     metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True),
-    Column("tenant_id", UUID(as_uuid=True), nullable=False),
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("owner_id", PGUUID(as_uuid=True), nullable=False),
     Column("name", String(200), nullable=False),
+    Column("description", String(4000), nullable=False),
+    Column("visibility", String(32), nullable=False),
+    Column("status", String(32), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("tenant_id", "id", name="uq_knowledge_bases_tenant_id_id"),
+)
+documents = Table(
+    "documents",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("external_key", String(500), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+document_versions = Table(
+    "document_versions",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_id", PGUUID(as_uuid=True), nullable=False),
+    Column("revision", Integer, nullable=False),
+    Column("source_sha256", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("file_name", String(500), nullable=False),
+    Column("media_type", String(100), nullable=False),
+    Column("object_key", String(1000), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("activated_at", DateTime(timezone=True), nullable=True),
+)
+ingestion_jobs = Table(
+    "ingestion_jobs",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_version_id", PGUUID(as_uuid=True), nullable=False),
+    Column("requested_by", PGUUID(as_uuid=True), nullable=False),
+    Column("idempotency_key", String(300), nullable=False),
+    Column("request_sha256", String(64), nullable=False),
+    Column("trace_id", PGUUID(as_uuid=True), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("progress", Float, nullable=False),
+    Column("error_code", String(100), nullable=True),
+    Column("error_message", String(1000), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+upload_idempotency_keys = Table(
+    "upload_idempotency_keys",
+    metadata,
+    Column("tenant_id", PGUUID(as_uuid=True), primary_key=True),
+    Column("idempotency_key", String(300), primary_key=True),
+    Column("request_sha256", String(64), nullable=False),
+    Column("job_id", PGUUID(as_uuid=True), nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+document_blocks = Table(
+    "document_blocks",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_version_id", PGUUID(as_uuid=True), nullable=False),
+    Column("ordinal", Integer, nullable=False),
+    Column("kind", String(50), nullable=False),
+    Column("text", Text, nullable=False),
+    Column("start_character", Integer, nullable=False),
+    Column("end_character", Integer, nullable=False),
+)
+document_chunks = Table(
+    "document_chunks",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_version_id", PGUUID(as_uuid=True), nullable=False),
+    Column("ordinal", Integer, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("source", JSONB, nullable=False),
+)
+index_versions = Table(
+    "index_versions",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("generation", Integer, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("embedding_model_id", String(200), nullable=False),
+    Column("vector_dimensions", Integer, nullable=False),
+    Column("chunk_count", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+)
+chunk_embeddings = Table(
+    "chunk_embeddings",
+    metadata,
+    Column("index_version_id", PGUUID(as_uuid=True), primary_key=True),
+    Column("chunk_id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("embedding", VECTOR(8), nullable=False),
+)
+retrieval_traces = Table(
+    "retrieval_traces",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False),
+    Column("query_sha256", String(64), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("candidate_count", Integer, nullable=False),
+    Column("selected_chunk_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False),
+    Column("authorization_applied", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 
@@ -55,10 +219,7 @@ class SqlAlchemyTransaction(AbstractContextManager[None]):
 
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         try:
-            if exc_type is None:
-                self.commit()
-            else:
-                self.rollback()
+            self.commit() if exc_type is None else self.rollback()
         finally:
             self._connection.close()
 
@@ -72,23 +233,28 @@ class SqlAlchemyTransactionManager:
 
 
 class PostgresKnowledgeBaseRepository:
+    """R1 compatibility adapter backed by the expanded R2 table."""
+
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
     def add(self, knowledge_base: KnowledgeBase) -> None:
         with self._engine.begin() as connection:
             connection.execute(
-                knowledge_bases.insert().values(
+                insert(knowledge_bases).values(
                     id=knowledge_base.id.value,
                     tenant_id=knowledge_base.tenant_id.value,
+                    owner_id=knowledge_base.tenant_id.value,
                     name=knowledge_base.name,
+                    description="",
+                    visibility="private",
+                    status="active",
                     created_at=knowledge_base.created_at,
+                    updated_at=knowledge_base.created_at,
                 )
             )
 
-    def get(
-        self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId
-    ) -> KnowledgeBase | None:
+    def get(self, tenant_id: TenantId, knowledge_base_id: KnowledgeBaseId) -> KnowledgeBase | None:
         statement = select(knowledge_bases).where(
             knowledge_bases.c.id == knowledge_base_id.value,
             knowledge_bases.c.tenant_id == tenant_id.value,
@@ -97,13 +263,621 @@ class PostgresKnowledgeBaseRepository:
             row = connection.execute(statement).mappings().one_or_none()
         if row is None:
             return None
-        values: dict[str, Any] = dict(row)
-        created_at = values["created_at"]
-        if not isinstance(created_at, datetime):
-            raise TypeError("database returned an invalid created_at")
         return KnowledgeBase(
-            id=KnowledgeBaseId(values["id"]),
-            tenant_id=TenantId(values["tenant_id"]),
-            name=str(values["name"]),
-            created_at=created_at,
+            KnowledgeBaseId(row["id"]),
+            TenantId(row["tenant_id"]),
+            str(row["name"]),
+            cast(datetime, row["created_at"]),
+        )
+
+
+class PostgresKnowledgeRepository:
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def create_knowledge_base(self, value: KnowledgeBaseRecord) -> None:
+        with self._engine.begin() as connection:
+            connection.execute(
+                pg_insert(tenants)
+                .values(
+                    id=value.tenant_id.value,
+                    name=f"tenant-{value.tenant_id}",
+                    status="active",
+                    created_at=value.created_at,
+                )
+                .on_conflict_do_nothing(index_elements=[tenants.c.id])
+            )
+            connection.execute(
+                insert(knowledge_bases).values(
+                    id=value.id.value,
+                    tenant_id=value.tenant_id.value,
+                    owner_id=value.owner_id.value,
+                    name=value.name,
+                    description=value.description,
+                    visibility=value.visibility,
+                    status=value.status,
+                    created_at=value.created_at,
+                    updated_at=value.updated_at,
+                )
+            )
+
+    def get_knowledge_base(
+        self, context: AuthorizationContext, knowledge_base_id: KnowledgeBaseId
+    ) -> KnowledgeBaseRecord | None:
+        CorePolicies.require_knowledge_base(context, knowledge_base_id)
+        statement = select(knowledge_bases).where(
+            knowledge_bases.c.id == knowledge_base_id.value,
+            knowledge_bases.c.tenant_id == context.tenant_id.value,
+            knowledge_bases.c.status == "active",
+        )
+        with self._engine.connect() as connection:
+            row = connection.execute(statement).mappings().one_or_none()
+        return None if row is None else self._knowledge_base(row)
+
+    def register_upload(
+        self,
+        *,
+        context: AuthorizationContext,
+        knowledge_base_id: KnowledgeBaseId,
+        file_name: str,
+        media_type: str,
+        object_key: str,
+        source_sha256: str,
+        size_bytes: int,
+        idempotency_key: str,
+        now: datetime,
+    ) -> UploadSubmission:
+        request_sha256 = hashlib.sha256(
+            f"{knowledge_base_id}\x1f{file_name}\x1f{media_type}\x1f{source_sha256}".encode()
+        ).hexdigest()
+        with self._engine.begin() as connection:
+            existing = (
+                connection.execute(
+                    select(ingestion_jobs, upload_idempotency_keys.c.request_sha256)
+                    .join(
+                        upload_idempotency_keys,
+                        upload_idempotency_keys.c.job_id == ingestion_jobs.c.id,
+                    )
+                    .where(
+                        upload_idempotency_keys.c.tenant_id == context.tenant_id.value,
+                        upload_idempotency_keys.c.idempotency_key == idempotency_key,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if existing is not None:
+                if existing["request_sha256"] != request_sha256:
+                    raise IdempotencyConflict("idempotency key is bound to different input")
+                return UploadSubmission(self._job(existing), True)
+
+            document_id = DocumentId(
+                uuid5(
+                    _STABLE_NAMESPACE,
+                    f"document:{context.tenant_id}:{knowledge_base_id}:{file_name.casefold()}",
+                )
+            )
+            document = (
+                connection.execute(
+                    select(documents).where(
+                        documents.c.id == document_id.value,
+                        documents.c.tenant_id == context.tenant_id.value,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if document is None:
+                connection.execute(
+                    insert(documents).values(
+                        id=document_id.value,
+                        tenant_id=context.tenant_id.value,
+                        knowledge_base_id=knowledge_base_id.value,
+                        external_key=file_name,
+                        created_at=now,
+                    )
+                )
+            existing_version = (
+                connection.execute(
+                    select(document_versions).where(
+                        document_versions.c.tenant_id == context.tenant_id.value,
+                        document_versions.c.document_id == document_id.value,
+                        document_versions.c.source_sha256 == source_sha256,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            version_id = DocumentVersionId(
+                uuid5(_STABLE_NAMESPACE, f"version:{document_id}:{source_sha256}")
+            )
+            if existing_version is None:
+                revision = cast(
+                    int,
+                    connection.scalar(
+                        select(func.coalesce(func.max(document_versions.c.revision), 0) + 1).where(
+                            document_versions.c.tenant_id == context.tenant_id.value,
+                            document_versions.c.document_id == document_id.value,
+                        )
+                    ),
+                )
+                connection.execute(
+                    insert(document_versions).values(
+                        id=version_id.value,
+                        tenant_id=context.tenant_id.value,
+                        document_id=document_id.value,
+                        revision=revision,
+                        source_sha256=source_sha256,
+                        status="draft",
+                        created_at=now,
+                        file_name=file_name,
+                        media_type=media_type,
+                        object_key=object_key,
+                        size_bytes=size_bytes,
+                    )
+                )
+            else:
+                version_id = DocumentVersionId(existing_version["id"])
+                prior_job = (
+                    connection.execute(
+                        select(ingestion_jobs).where(
+                            ingestion_jobs.c.tenant_id == context.tenant_id.value,
+                            ingestion_jobs.c.document_version_id == version_id.value,
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
+                if prior_job is not None:
+                    connection.execute(
+                        insert(upload_idempotency_keys).values(
+                            tenant_id=context.tenant_id.value,
+                            idempotency_key=idempotency_key,
+                            request_sha256=request_sha256,
+                            job_id=prior_job["id"],
+                            created_at=now,
+                        )
+                    )
+                    return UploadSubmission(self._job(prior_job), True)
+            job_id = JobId(uuid5(_STABLE_NAMESPACE, f"job:{context.tenant_id}:{idempotency_key}"))
+            trace_id = TraceId(uuid5(_STABLE_NAMESPACE, f"upload-trace:{job_id}"))
+            connection.execute(
+                insert(ingestion_jobs).values(
+                    id=job_id.value,
+                    tenant_id=context.tenant_id.value,
+                    knowledge_base_id=knowledge_base_id.value,
+                    document_id=document_id.value,
+                    document_version_id=version_id.value,
+                    requested_by=context.actor_id.value,
+                    idempotency_key=idempotency_key,
+                    request_sha256=request_sha256,
+                    trace_id=trace_id.value,
+                    status="pending",
+                    progress=0.0,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            connection.execute(
+                insert(upload_idempotency_keys).values(
+                    tenant_id=context.tenant_id.value,
+                    idempotency_key=idempotency_key,
+                    request_sha256=request_sha256,
+                    job_id=job_id.value,
+                    created_at=now,
+                )
+            )
+            row = (
+                connection.execute(
+                    select(ingestion_jobs).where(ingestion_jobs.c.id == job_id.value)
+                )
+                .mappings()
+                .one()
+            )
+            return UploadSubmission(self._job(row), False)
+
+    def get_job(self, context: AuthorizationContext, job_id: JobId) -> IngestionJobRecord | None:
+        with self._engine.connect() as connection:
+            row = (
+                connection.execute(
+                    select(ingestion_jobs).where(
+                        ingestion_jobs.c.id == job_id.value,
+                        ingestion_jobs.c.tenant_id == context.tenant_id.value,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        return None if row is None else self._job(row)
+
+    def next_pending_job(self) -> JobId | None:
+        with self._engine.connect() as connection:
+            value = connection.scalar(
+                select(ingestion_jobs.c.id)
+                .where(ingestion_jobs.c.status == "pending")
+                .order_by(ingestion_jobs.c.created_at)
+                .limit(1)
+            )
+        return None if value is None else JobId(value)
+
+    def begin_ingestion(self, job_id: JobId, now: datetime) -> IngestionSource:
+        with self._engine.begin() as connection:
+            row = (
+                connection.execute(
+                    select(
+                        ingestion_jobs,
+                        document_versions.c.file_name,
+                        document_versions.c.media_type,
+                        document_versions.c.object_key,
+                        document_versions.c.source_sha256,
+                    )
+                    .join(
+                        document_versions,
+                        document_versions.c.id == ingestion_jobs.c.document_version_id,
+                    )
+                    .where(ingestion_jobs.c.id == job_id.value)
+                    .with_for_update()
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if row is None:
+                raise ResourceNotFound("ingestion job not found")
+            if row["status"] == "succeeded":
+                return self._source(row)
+            connection.execute(
+                update(ingestion_jobs)
+                .where(ingestion_jobs.c.id == job_id.value)
+                .values(status="running", progress=0.1, updated_at=now)
+            )
+            values = dict(row)
+            values.update(status="running", progress=0.1, updated_at=now)
+            return self._source(values)
+
+    def stage_generation(
+        self,
+        source: IngestionSource,
+        document: CompiledDocument,
+        vectors: tuple[tuple[float, ...], ...],
+        embedding_model_id: str,
+        now: datetime,
+    ) -> StagedGeneration:
+        if len(document.chunks) != len(vectors) or not vectors:
+            raise ValueError("each chunk requires one embedding")
+        dimensions = len(vectors[0])
+        if dimensions != 8 or any(len(vector) != dimensions for vector in vectors):
+            raise ValueError("R2 pgvector profile requires 8 dimensions")
+        with self._engine.begin() as connection:
+            active = (
+                connection.execute(
+                    select(index_versions).where(
+                        index_versions.c.tenant_id == source.job.tenant_id.value,
+                        index_versions.c.knowledge_base_id == source.job.knowledge_base_id.value,
+                        index_versions.c.status == "active",
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            generation = 1 if active is None else int(active["generation"]) + 1
+            index_version_id = IndexVersionId(uuid4())
+            connection.execute(
+                insert(index_versions).values(
+                    id=index_version_id.value,
+                    tenant_id=source.job.tenant_id.value,
+                    knowledge_base_id=source.job.knowledge_base_id.value,
+                    generation=generation,
+                    status="candidate",
+                    embedding_model_id=embedding_model_id,
+                    vector_dimensions=dimensions,
+                    chunk_count=len(document.chunks),
+                    created_at=now,
+                )
+            )
+            connection.execute(
+                delete(document_blocks).where(
+                    document_blocks.c.document_version_id == source.job.document_version_id.value
+                )
+            )
+            connection.execute(
+                delete(document_chunks).where(
+                    document_chunks.c.document_version_id == source.job.document_version_id.value
+                )
+            )
+            if document.blocks:
+                connection.execute(
+                    insert(document_blocks),
+                    [
+                        {
+                            "id": block.id.value,
+                            "tenant_id": source.job.tenant_id.value,
+                            "document_version_id": source.job.document_version_id.value,
+                            "ordinal": block.ordinal,
+                            "kind": block.kind,
+                            "text": block.text,
+                            "start_character": block.start_character,
+                            "end_character": block.end_character,
+                        }
+                        for block in document.blocks
+                    ],
+                )
+            connection.execute(
+                insert(document_chunks),
+                [
+                    {
+                        "id": chunk.id.value,
+                        "tenant_id": source.job.tenant_id.value,
+                        "knowledge_base_id": source.job.knowledge_base_id.value,
+                        "document_id": source.job.document_id.value,
+                        "document_version_id": source.job.document_version_id.value,
+                        "ordinal": chunk.ordinal,
+                        "text": chunk.text,
+                        "source": dict(chunk.source),
+                    }
+                    for chunk in document.chunks
+                ],
+            )
+            inherited: list[dict[str, object]] = []
+            if active is not None:
+                inherited_rows = connection.execute(
+                    select(chunk_embeddings)
+                    .join(
+                        document_chunks,
+                        document_chunks.c.id == chunk_embeddings.c.chunk_id,
+                    )
+                    .where(
+                        chunk_embeddings.c.index_version_id == active["id"],
+                        document_chunks.c.document_id != source.job.document_id.value,
+                    )
+                ).mappings()
+                inherited = [
+                    {
+                        "index_version_id": index_version_id.value,
+                        "chunk_id": row["chunk_id"],
+                        "tenant_id": row["tenant_id"],
+                        "knowledge_base_id": row["knowledge_base_id"],
+                        "embedding": row["embedding"],
+                    }
+                    for row in inherited_rows
+                ]
+            current = [
+                {
+                    "index_version_id": index_version_id.value,
+                    "chunk_id": chunk.id.value,
+                    "tenant_id": source.job.tenant_id.value,
+                    "knowledge_base_id": source.job.knowledge_base_id.value,
+                    "embedding": list(vector),
+                }
+                for chunk, vector in zip(document.chunks, vectors, strict=True)
+            ]
+            connection.execute(insert(chunk_embeddings), inherited + current)
+            total_count = len(inherited) + len(current)
+            connection.execute(
+                update(index_versions)
+                .where(index_versions.c.id == index_version_id.value)
+                .values(chunk_count=total_count)
+            )
+        return StagedGeneration(index_version_id, generation, total_count, dimensions)
+
+    def validate_generation(self, value: StagedGeneration) -> None:
+        with self._engine.connect() as connection:
+            count = connection.scalar(
+                select(func.count())
+                .select_from(chunk_embeddings)
+                .where(chunk_embeddings.c.index_version_id == value.index_version_id.value)
+            )
+        if count != value.chunk_count or value.chunk_count < 1 or value.vector_dimensions != 8:
+            raise ValueError("candidate generation failed validation")
+
+    def publish_generation(
+        self, source: IngestionSource, value: StagedGeneration, now: datetime
+    ) -> IngestionJobRecord:
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(index_versions)
+                .where(
+                    index_versions.c.tenant_id == source.job.tenant_id.value,
+                    index_versions.c.knowledge_base_id == source.job.knowledge_base_id.value,
+                    index_versions.c.status == "active",
+                )
+                .values(status="superseded")
+            )
+            connection.execute(
+                update(index_versions)
+                .where(index_versions.c.id == value.index_version_id.value)
+                .values(status="active", published_at=now)
+            )
+            connection.execute(
+                update(document_versions)
+                .where(
+                    document_versions.c.tenant_id == source.job.tenant_id.value,
+                    document_versions.c.document_id == source.job.document_id.value,
+                    document_versions.c.status == "active",
+                    document_versions.c.id != source.job.document_version_id.value,
+                )
+                .values(status="superseded")
+            )
+            connection.execute(
+                update(document_versions)
+                .where(document_versions.c.id == source.job.document_version_id.value)
+                .values(status="active", activated_at=now)
+            )
+            connection.execute(
+                update(ingestion_jobs)
+                .where(ingestion_jobs.c.id == source.job.id.value)
+                .values(status="succeeded", progress=1.0, updated_at=now)
+            )
+            row = (
+                connection.execute(
+                    select(ingestion_jobs).where(ingestion_jobs.c.id == source.job.id.value)
+                )
+                .mappings()
+                .one()
+            )
+        return self._job(row)
+
+    def fail_ingestion(self, job_id: JobId, *, code: str, message: str, now: datetime) -> None:
+        with self._engine.begin() as connection:
+            connection.execute(
+                update(ingestion_jobs)
+                .where(ingestion_jobs.c.id == job_id.value)
+                .values(
+                    status="failed",
+                    error_code=code,
+                    error_message=message,
+                    updated_at=now,
+                )
+            )
+
+    def search(
+        self,
+        context: AuthorizationContext,
+        knowledge_base_ids: tuple[KnowledgeBaseId, ...],
+        query_vector: tuple[float, ...],
+        top_k: int,
+    ) -> tuple[SearchHit, ...]:
+        for knowledge_base_id in knowledge_base_ids:
+            CorePolicies.require_knowledge_base(context, knowledge_base_id)
+        ids = [value.value for value in knowledge_base_ids]
+        distance = chunk_embeddings.c.embedding.cosine_distance(list(query_vector))
+        statement = (
+            select(document_chunks, (1.0 - distance).label("score"))
+            .join(
+                chunk_embeddings,
+                chunk_embeddings.c.chunk_id == document_chunks.c.id,
+            )
+            .join(
+                index_versions,
+                index_versions.c.id == chunk_embeddings.c.index_version_id,
+            )
+            .join(
+                document_versions,
+                document_versions.c.id == document_chunks.c.document_version_id,
+            )
+            .where(
+                document_chunks.c.tenant_id == context.tenant_id.value,
+                chunk_embeddings.c.tenant_id == context.tenant_id.value,
+                index_versions.c.tenant_id == context.tenant_id.value,
+                document_chunks.c.knowledge_base_id.in_(ids),
+                chunk_embeddings.c.knowledge_base_id.in_(ids),
+                index_versions.c.knowledge_base_id.in_(ids),
+                index_versions.c.status == "active",
+                document_versions.c.status == "active",
+            )
+            .order_by(distance, document_chunks.c.id)
+            .limit(top_k)
+        )
+        with self._engine.connect() as connection:
+            rows = connection.execute(statement).mappings().all()
+        return tuple(
+            SearchHit(
+                TenantId(row["tenant_id"]),
+                KnowledgeBaseId(row["knowledge_base_id"]),
+                DocumentId(row["document_id"]),
+                DocumentVersionId(row["document_version_id"]),
+                ChunkId(row["id"]),
+                str(row["text"]),
+                cast(dict[str, str], row["source"]),
+                float(row["score"]),
+                rank,
+            )
+            for rank, row in enumerate(rows, start=1)
+        )
+
+    def save_trace(self, value: RetrievalTraceRecord) -> None:
+        with self._engine.begin() as connection:
+            connection.execute(
+                insert(retrieval_traces).values(
+                    id=value.id.value,
+                    tenant_id=value.tenant_id.value,
+                    knowledge_base_ids=[item.value for item in value.knowledge_base_ids],
+                    query_sha256=value.query_sha256,
+                    status=value.status,
+                    candidate_count=value.candidate_count,
+                    selected_chunk_ids=[item.value for item in value.selected_chunk_ids],
+                    authorization_applied=value.authorization_applied,
+                    created_at=value.created_at,
+                )
+            )
+
+    def get_trace(
+        self, context: AuthorizationContext, trace_id: TraceId
+    ) -> RetrievalTraceRecord | None:
+        with self._engine.connect() as connection:
+            row = (
+                connection.execute(
+                    select(retrieval_traces).where(
+                        retrieval_traces.c.id == trace_id.value,
+                        retrieval_traces.c.tenant_id == context.tenant_id.value,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+        if row is None:
+            return None
+        return RetrievalTraceRecord(
+            TraceId(row["id"]),
+            TenantId(row["tenant_id"]),
+            tuple(KnowledgeBaseId(value) for value in row["knowledge_base_ids"]),
+            str(row["query_sha256"]),
+            str(row["status"]),
+            int(row["candidate_count"]),
+            tuple(ChunkId(value) for value in row["selected_chunk_ids"]),
+            bool(row["authorization_applied"]),
+            cast(datetime, row["created_at"]),
+        )
+
+    def document_version_status(
+        self, document_version_id: DocumentVersionId
+    ) -> VersionStatus | None:
+        with self._engine.connect() as connection:
+            value = connection.scalar(
+                select(document_versions.c.status).where(
+                    document_versions.c.id == document_version_id.value
+                )
+            )
+        return None if value is None else VersionStatus(str(value))
+
+    @staticmethod
+    def _knowledge_base(row: Any) -> KnowledgeBaseRecord:
+        return KnowledgeBaseRecord(
+            KnowledgeBaseId(row["id"]),
+            TenantId(row["tenant_id"]),
+            ActorId(row["owner_id"]),
+            str(row["name"]),
+            str(row["description"]),
+            str(row["visibility"]),
+            str(row["status"]),
+            cast(datetime, row["created_at"]),
+            cast(datetime, row["updated_at"]),
+        )
+
+    @staticmethod
+    def _job(row: Any) -> IngestionJobRecord:
+        return IngestionJobRecord(
+            JobId(row["id"]),
+            TenantId(row["tenant_id"]),
+            KnowledgeBaseId(row["knowledge_base_id"]),
+            DocumentId(row["document_id"]),
+            DocumentVersionId(row["document_version_id"]),
+            ActorId(row["requested_by"]),
+            str(row["idempotency_key"]),
+            TraceId(row["trace_id"]),
+            WorkStatus(str(row["status"])),
+            float(row["progress"]),
+            cast(datetime, row["created_at"]),
+            cast(datetime, row["updated_at"]),
+            cast(str | None, row["error_code"]),
+            cast(str | None, row["error_message"]),
+        )
+
+    @classmethod
+    def _source(cls, row: Any) -> IngestionSource:
+        return IngestionSource(
+            cls._job(row),
+            str(row["file_name"]),
+            str(row["media_type"]),
+            str(row["object_key"]),
+            str(row["source_sha256"]),
         )

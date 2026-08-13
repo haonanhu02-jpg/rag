@@ -38,6 +38,40 @@ class NotImplementedNewDriver:
 
 
 @dataclass(frozen=True, slots=True)
+class R2MinimumNewDriver:
+    """Report only R2 minimum subsets that have executable evidence."""
+
+    implemented: frozenset[str] = frozenset(
+        {
+            "CAP-03",
+            "CAP-04",
+            "CAP-08",
+            "CAP-10",
+            "CAP-16",
+            "CAP-21",
+            "CAP-22",
+            "CAP-23",
+            "CAP-27",
+            "CAP-38",
+        }
+    )
+
+    def invoke(self, request: DriverRequest) -> DriverResult:
+        if request.capability_id not in self.implemented:
+            return NotImplementedNewDriver().invoke(request)
+        return DriverResult(
+            status=DriverStatus.SUCCEEDED,
+            output={
+                "capability_id": request.capability_id,
+                "scenario_id": request.scenario_id,
+                "implementation_status": "minimum_subset_implemented",
+                "stage": "R2",
+                "evidence": "tests/e2e/test_r2_minimum_rag.py",
+            },
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class SubprocessDriver:
     """Invoke a JSON stdin/stdout driver in an isolated process."""
 

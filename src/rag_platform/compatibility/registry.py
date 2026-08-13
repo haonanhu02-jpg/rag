@@ -114,4 +114,3 @@ def validate_registry_links(capabilities_path: Path, scenarios_path: Path) -> No
         for scenario_id in cast(list[str], item["acceptance"]):
             if scenario_capability[scenario_id] != capability_id:
                 raise RegistryError(f"{scenario_id} linked to wrong capability")
-

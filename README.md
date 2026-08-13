@@ -14,9 +14,9 @@
 
 ## 当前状态
 
-R0 兼容基线与绿地工程、R1 领域基础均已完成。R1 已交付可信授权、ModelRuntime、基础
-PostgreSQL Adapter、三个进程入口和首批迁移。当前仍不包含业务 RAG 链路；上传、切块、
-检索和问答从 R2 起按目标阶段取得实现和兼容证据。
+R0 兼容基线、R1 领域基础和 R2 最小独立 RAG 竖切均已完成。新项目现在可独立完成
+TXT/Markdown 上传、稳定 General Chunk、Embedding、pgvector 索引、授权向量检索、非流式回答、
+Citation 和基础 Retrieval Trace。R2 只表示相关 CAP 的最小子集；完整能力仍按 R3–R6 扩展。
 
 ## 文档
 
@@ -25,6 +25,7 @@ PostgreSQL Adapter、三个进程入口和首批迁移。当前仍不包含业�
 - [兼容测试与代码复用规则](docs/compatibility-and-reuse.md)
 - [R0 执行记录](docs/phases/r0-compatibility-baseline.md)
 - [R1 执行记录](docs/phases/r1-domain-foundation.md)
+- [R2 执行记录](docs/phases/r2-minimum-rag.md)
 - [风险登记](docs/risks.md)
 - [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md)
 - [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)

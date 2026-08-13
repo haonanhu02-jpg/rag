@@ -13,6 +13,7 @@ from rag_platform.compatibility.contracts import (
 from rag_platform.compatibility.drivers import (
     NotImplementedNewDriver,
     PinnedReferenceDriver,
+    R2MinimumNewDriver,
     SubprocessDriver,
 )
 
@@ -26,7 +27,7 @@ __all__ = [
     "DriverStatus",
     "NotImplementedNewDriver",
     "PinnedReferenceDriver",
+    "R2MinimumNewDriver",
     "SubprocessDriver",
     "compare_results",
 ]
-
