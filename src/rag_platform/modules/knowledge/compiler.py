@@ -1,37 +1,146 @@
-"""Deterministic R2 TXT/Markdown compiler with stable source-bound IDs."""
+"""Deep DocumentCompiler interface over independent parser and chunk adapters."""
 
 from __future__ import annotations
 
 import hashlib
 import re
+from io import BytesIO
+from pathlib import PurePath
 from uuid import UUID, uuid5
+from zipfile import BadZipFile, ZipFile
 
 from rag_platform.domain.identifiers import (
     BlockId,
-    ChunkId,
     DocumentId,
+    DocumentVersionId,
     KnowledgeBaseId,
     TenantId,
 )
+from rag_platform.modules.knowledge.chunking import CHUNK_METHODS, ChunkMethodRegistry
 from rag_platform.modules.knowledge.contracts import (
+    BinaryDocumentParser,
     CompiledBlock,
-    CompiledChunk,
     CompiledDocument,
+    DocumentParseError,
+    DocumentResourceLimit,
+    ParsedDocument,
+    ParsedPayload,
+    ParserLimits,
+    ParserRequest,
     UnsupportedDocument,
 )
 
-COMPILER_VERSION = "plain-text-v1"
-_STABLE_NAMESPACE = UUID("540de5a4-3814-5b4e-9587-c0860034e303")
-_SUPPORTED_MEDIA_TYPES = frozenset({"text/plain", "text/markdown"})
-_BLOCK_PATTERN = re.compile(r"\S(?:.*?\S)?(?=\n\s*\n|\Z)", re.DOTALL)
+COMPILER_VERSION = "document-compiler-v3"
+_VERSION_NAMESPACE = UUID("a44d46cf-592f-536a-9ae5-90bd9d5ef26c")
+_EXTENSIONS = {
+    ".txt": "text",
+    ".md": "markdown",
+    ".markdown": "markdown",
+    ".html": "html",
+    ".htm": "html",
+    ".pdf": "pdf",
+    ".docx": "docx",
+    ".pptx": "pptx",
+    ".xlsx": "xlsx",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".tif": "image",
+    ".tiff": "image",
+    ".bmp": "image",
+    ".webp": "image",
+}
+_MEDIA_TYPES = {
+    "text/plain": "text",
+    "text/markdown": "markdown",
+    "text/x-markdown": "markdown",
+    "text/html": "html",
+    "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "image/png": "image",
+    "image/jpeg": "image",
+    "image/tiff": "image",
+    "image/bmp": "image",
+    "image/webp": "image",
+}
 
 
-class PlainTextDocumentCompiler:
-    def __init__(self, *, chunk_characters: int = 800, overlap_characters: int = 100) -> None:
-        if chunk_characters < 64 or not 0 <= overlap_characters < chunk_characters:
-            raise ValueError("invalid chunk sizing")
-        self._chunk_characters = chunk_characters
-        self._overlap_characters = overlap_characters
+class DocumentFormatRouter:
+    """Reconcile declared MIME, extension, and byte signatures without guessing binary input."""
+
+    @classmethod
+    def resolve(cls, *, file_name: str, media_type: str, content: bytes) -> str:
+        declared = _MEDIA_TYPES.get(media_type.casefold().split(";", maxsplit=1)[0].strip())
+        extension = _EXTENSIONS.get(PurePath(file_name).suffix.casefold())
+        sniffed = cls._sniff(content)
+        if declared in {"text", "markdown"} and extension == declared and sniffed is None:
+            return declared
+        if sniffed is None:
+            if declared in {"pdf", "docx", "pptx", "xlsx", "image", "html"}:
+                raise DocumentParseError(
+                    "document_signature_invalid", "document content lacks its required signature"
+                )
+            candidates = {value for value in (declared, extension) if value is not None}
+        else:
+            candidates = {value for value in (declared, extension, sniffed) if value is not None}
+        if not candidates:
+            raise UnsupportedDocument("unsupported document type")
+        if len(candidates) > 1:
+            raise DocumentParseError(
+                "document_type_mismatch", "MIME, extension, and content disagree"
+            )
+        return candidates.pop()
+
+    @staticmethod
+    def _sniff(content: bytes) -> str | None:
+        prefix = content[:4096].lstrip()
+        if prefix.startswith(b"%PDF-"):
+            return "pdf"
+        if prefix.startswith((b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"BM")):
+            return "image"
+        if prefix[:4] in {b"II*\x00", b"MM\x00*", b"RIFF"}:
+            return "image"
+        if prefix.startswith(b"PK\x03\x04"):
+            try:
+                with ZipFile(BytesIO(content)) as archive:
+                    names = set(archive.namelist())
+            except BadZipFile as exc:
+                raise DocumentParseError("parser_ooxml_invalid", "invalid OOXML package") from exc
+            if "word/document.xml" in names:
+                return "docx"
+            if "ppt/presentation.xml" in names:
+                return "pptx"
+            if "xl/workbook.xml" in names:
+                return "xlsx"
+            return None
+        lowered = prefix[:1024].lower()
+        if re.search(br"<!doctype\s+html|<html\b|<(?:body|head|h[1-6]|p)\b", lowered):
+            return "html"
+        return None
+
+
+class DocumentCompiler:
+    """The only ingestion-facing interface for all supported document formats."""
+
+    def __init__(
+        self,
+        parsers: tuple[BinaryDocumentParser, ...],
+        *,
+        limits: ParserLimits | None = None,
+        chunker: ChunkMethodRegistry | None = None,
+        ocr_language: str = "eng",
+    ) -> None:
+        self._limits = limits or ParserLimits()
+        self._chunker = chunker or ChunkMethodRegistry()
+        self._ocr_language = ocr_language
+        self._parsers: dict[str, BinaryDocumentParser] = {}
+        for parser in parsers:
+            for format_id in parser.format_ids:
+                if format_id in self._parsers:
+                    raise ValueError(f"duplicate parser for {format_id}")
+                self._parsers[format_id] = parser
 
     def compile(
         self,
@@ -43,76 +152,143 @@ class PlainTextDocumentCompiler:
         content: bytes,
         source_sha256: str,
         file_name: str,
+        chunk_method: str = "general",
     ) -> CompiledDocument:
-        if media_type not in _SUPPORTED_MEDIA_TYPES:
-            raise UnsupportedDocument(f"unsupported R2 media type: {media_type}")
+        if not content:
+            raise UnsupportedDocument("document is empty")
+        if len(content) > self._limits.max_file_bytes:
+            raise DocumentResourceLimit("file_bytes", "document exceeds byte limit")
+        if chunk_method not in CHUNK_METHODS:
+            raise UnsupportedDocument(f"unsupported chunk method: {chunk_method}")
+        format_id = DocumentFormatRouter.resolve(
+            file_name=file_name, media_type=media_type, content=content
+        )
+        version_id = DocumentVersionId(
+            uuid5(_VERSION_NAMESPACE, f"{document_id}:{source_sha256}")
+        )
+        request = ParserRequest(
+            tenant_id,
+            knowledge_base_id,
+            document_id,
+            version_id,
+            source_sha256,
+            file_name,
+            media_type,
+            format_id,
+            self._limits,
+            self._ocr_language,
+        )
+        payload = self._parsers[format_id].parse(content, request)
+        if not payload.blocks:
+            raise DocumentParseError("parser_no_content", "document produced no usable blocks")
+        parsed = ParsedDocument(
+            2,
+            payload.parser_name,
+            payload.parser_version,
+            media_type,
+            file_name,
+            payload.blocks,
+            payload.warnings,
+            payload.page_count,
+        )
+        scope = f"{tenant_id}:{knowledge_base_id}:{document_id}:{source_sha256}"
+        chunks = self._chunker.chunk(
+            parsed,
+            method=chunk_method,
+            identity_scope=scope,
+            file_name=file_name,
+        )
+        if not chunks:
+            raise DocumentParseError("chunk_no_content", "document produced no usable chunks")
+        normalized = "\n\n".join(
+            block.text.strip() for block in payload.blocks if block.text.strip()
+        )
+        normalized_sha256 = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        return CompiledDocument(
+            payload.blocks,
+            chunks,
+            normalized_sha256,
+            COMPILER_VERSION,
+            parsed,
+        )
+
+
+class PlainTextDocumentCompiler:
+    """Compatibility facade retained for callers that only need R2 text compilation."""
+
+    def __init__(self, *, chunk_characters: int = 800, overlap_characters: int = 100) -> None:
+        if chunk_characters < 64 or not 0 <= overlap_characters < chunk_characters:
+            raise ValueError("invalid chunk sizing")
+        max_tokens = max(32, chunk_characters // 4)
+        overlap = min(max_tokens - 1, overlap_characters // 4)
+        self._compiler = DocumentCompiler(
+            (_CompatibilityTextParser(),),
+            chunker=ChunkMethodRegistry(max_tokens=max_tokens, overlap_tokens=overlap),
+        )
+
+    def compile(
+        self,
+        *,
+        tenant_id: TenantId,
+        knowledge_base_id: KnowledgeBaseId,
+        document_id: DocumentId,
+        media_type: str,
+        content: bytes,
+        source_sha256: str,
+        file_name: str,
+        chunk_method: str = "general",
+    ) -> CompiledDocument:
+        try:
+            content.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise UnsupportedDocument("R2 text documents must be valid UTF-8") from exc
+        return self._compiler.compile(
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            document_id=document_id,
+            media_type=media_type,
+            content=content,
+            source_sha256=source_sha256,
+            file_name=file_name,
+            chunk_method=chunk_method,
+        )
+
+
+class _CompatibilityTextParser:
+    """Small UTF-8 R2 facade; the R3 runtime uses the structured outbound parser."""
+
+    format_ids = frozenset({"text", "markdown"})
+
+    def parse(self, content: bytes, request: ParserRequest) -> ParsedPayload:
         try:
             text = content.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
             raise UnsupportedDocument("R2 text documents must be valid UTF-8") from exc
         normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
-        if not normalized:
-            raise UnsupportedDocument("document contains no text")
-        normalized_sha256 = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-        scope = f"{tenant_id}:{knowledge_base_id}:{document_id}:{source_sha256}:{COMPILER_VERSION}"
-        blocks = self._blocks(normalized, scope, media_type)
-        chunks = self._chunks(normalized, scope, file_name, media_type)
-        return CompiledDocument(blocks, chunks, normalized_sha256, COMPILER_VERSION)
-
-    @staticmethod
-    def _blocks(text: str, scope: str, media_type: str) -> tuple[CompiledBlock, ...]:
         values: list[CompiledBlock] = []
-        for ordinal, match in enumerate(_BLOCK_PATTERN.finditer(text)):
-            block_text = match.group().strip()
+        for match in re.finditer(r"\S(?:.*?\S)?(?=\n\s*\n|\Z)", normalized, re.S):
+            value = match.group().strip()
             start = match.start() + len(match.group()) - len(match.group().lstrip())
-            end = start + len(block_text)
+            end = start + len(value)
             kind = (
                 "heading"
-                if media_type == "text/markdown" and block_text.lstrip().startswith("#")
+                if request.format_id == "markdown" and value.startswith("#")
                 else "paragraph"
             )
-            identity = uuid5(_STABLE_NAMESPACE, f"block:{scope}:{start}:{end}:{kind}")
-            values.append(CompiledBlock(BlockId(identity), ordinal, kind, block_text, start, end))
-        return tuple(values)
-
-    def _chunks(
-        self, text: str, scope: str, file_name: str, media_type: str
-    ) -> tuple[CompiledChunk, ...]:
-        values: list[CompiledChunk] = []
-        start = 0
-        ordinal = 0
-        while start < len(text):
-            hard_end = min(len(text), start + self._chunk_characters)
-            end = self._boundary(text, start, hard_end)
-            chunk_text = text[start:end].strip()
-            actual_start = start + len(text[start:end]) - len(text[start:end].lstrip())
-            actual_end = actual_start + len(chunk_text)
             identity = uuid5(
-                _STABLE_NAMESPACE,
-                f"chunk:{scope}:{actual_start}:{actual_end}:general-v1",
+                _VERSION_NAMESPACE,
+                f"compatibility-block:{request.document_id}:{request.source_sha256}:{start}:{end}:{kind}",
             )
-            source = {
-                "file_name": file_name,
-                "media_type": media_type,
-                "start_character": str(actual_start),
-                "end_character": str(actual_end),
-                "start_line": str(text.count("\n", 0, actual_start) + 1),
-                "end_line": str(text.count("\n", 0, actual_end) + 1),
-                "chunk_method": "general",
-                "compiler_version": COMPILER_VERSION,
-            }
-            values.append(CompiledChunk(ChunkId(identity), ordinal, chunk_text, source))
-            if end == len(text):
-                break
-            start = max(end - self._overlap_characters, start + 1)
-            ordinal += 1
-        return tuple(values)
-
-    @staticmethod
-    def _boundary(text: str, start: int, hard_end: int) -> int:
-        if hard_end == len(text):
-            return hard_end
-        lower = start + max(1, (hard_end - start) // 2)
-        candidates = [text.rfind(marker, lower, hard_end) for marker in ("\n\n", "\n", " ")]
-        boundary = max(candidates)
-        return hard_end if boundary < lower else boundary + 1
+            values.append(
+                CompiledBlock(
+                    BlockId(identity),
+                    len(values),
+                    kind,
+                    value,
+                    start,
+                    end,
+                    parser_name="plain-text",
+                    parser_version="1",
+                )
+            )
+        return ParsedPayload("plain-text", "1", tuple(values))

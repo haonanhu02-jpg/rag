@@ -9,9 +9,11 @@ from langgraph.graph import END, START, StateGraph
 
 from rag_platform.domain.entities import WorkStatus
 from rag_platform.domain.identifiers import JobId
-from rag_platform.modules.knowledge.compiler import PlainTextDocumentCompiler
+from rag_platform.modules.knowledge.compiler import DocumentCompiler
 from rag_platform.modules.knowledge.contracts import (
     CompiledDocument,
+    DocumentParseError,
+    DocumentResourceLimit,
     IngestionJobRecord,
     IngestionSource,
     KnowledgeRepository,
@@ -36,7 +38,7 @@ class IngestionGraph:
         *,
         repository: KnowledgeRepository,
         object_store: ObjectStore,
-        compiler: PlainTextDocumentCompiler,
+        compiler: DocumentCompiler,
         models: ModelRuntime,
         embedding_model_id: str,
         clock: Clock,
@@ -68,9 +70,14 @@ class IngestionGraph:
             state = cast(IngestionState, self._graph.invoke({"job_id": job_id}))
             return state["job"]
         except Exception as exc:
+            code = "ingestion_failed"
+            if isinstance(exc, DocumentParseError):
+                code = exc.code
+            elif isinstance(exc, DocumentResourceLimit):
+                code = "parser_resource_limit"
             self._repository.fail_ingestion(
                 job_id,
-                code="ingestion_failed",
+                code=code,
                 message=str(exc)[:1000],
                 now=self._now(),
             )
@@ -102,6 +109,7 @@ class IngestionGraph:
             content=content,
             source_sha256=source.source_sha256,
             file_name=source.file_name,
+            chunk_method=source.chunk_method,
         )
         return {"document": document}
 

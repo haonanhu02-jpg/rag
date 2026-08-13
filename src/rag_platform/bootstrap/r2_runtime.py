@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rag_platform.adapters.outbound.document_parsers import build_document_parsers
 from rag_platform.adapters.outbound.object_store import FileObjectStore
+from rag_platform.adapters.outbound.ocr import TesseractOcrAdapter
 from rag_platform.adapters.outbound.postgres import (
     PostgresKnowledgeRepository,
     create_postgres_engine,
@@ -13,7 +15,9 @@ from rag_platform.adapters.outbound.system import SystemClock, UuidGenerator
 from rag_platform.bootstrap.settings import Settings
 from rag_platform.domain.identifiers import KnowledgeBaseId, TraceId
 from rag_platform.modules.grounded_rag import GroundedRag
-from rag_platform.modules.knowledge import KnowledgeService, PlainTextDocumentCompiler
+from rag_platform.modules.knowledge import KnowledgeService
+from rag_platform.modules.knowledge.compiler import DocumentCompiler
+from rag_platform.modules.knowledge.contracts import OcrEngine
 from rag_platform.modules.model_runtime import FakeModelRuntime
 from rag_platform.modules.model_runtime.contracts import ModelKind, ModelRegistration
 from rag_platform.modules.retrieval import AuthorizedRetrieval
@@ -24,7 +28,7 @@ CHAT_MODEL_ID = "r2-deterministic-chat"
 
 
 class R2Runtime:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, ocr: OcrEngine | None = None) -> None:
         self.engine = create_postgres_engine(settings.database_url)
         self.repository = PostgresKnowledgeRepository(self.engine)
         self.object_store = FileObjectStore(Path(settings.object_store_root))
@@ -56,7 +60,7 @@ class R2Runtime:
         self.ingestion = IngestionGraph(
             repository=self.repository,
             object_store=self.object_store,
-            compiler=PlainTextDocumentCompiler(),
+            compiler=DocumentCompiler(build_document_parsers(ocr or TesseractOcrAdapter())),
             models=self.models,
             embedding_model_id=EMBEDDING_MODEL_ID,
             clock=self.clock,

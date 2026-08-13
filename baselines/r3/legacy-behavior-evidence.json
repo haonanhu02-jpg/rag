@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "reference_commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "observations": [
+    {
+      "behavior": "eight_formats_preserve_structure_order_and_stable_ids",
+      "path": "tests/golden/parsing/test_format_parsers.py",
+      "git_blob": "f4939f410e8d6488897fd00c5ecd2469d6e7d2b3"
+    },
+    {
+      "behavior": "scanned_pdf_uses_visible_ocr_fallback",
+      "path": "tests/contract/parsing/test_degradation.py",
+      "git_blob": "e1ed8f6af183086d75feedb4808ddfe753f53bd6"
+    },
+    {
+      "behavior": "ooxml_image_pdf_and_xlsx_limits_fail_closed",
+      "path": "tests/performance/parsing/test_resource_limits.py",
+      "git_blob": "d142c4bff6b2eacd20d296b899a1a6ab955d7801"
+    },
+    {
+      "behavior": "nine_scenario_chunk_methods_preserve_source_metadata",
+      "path": "src/ragflow_agent/knowledge/infrastructure/chunking/scenario.py",
+      "git_blob": "c547253e38c2e3041c6ba0a00c0f769c14bc1c8b"
+    }
+  ],
+  "new_system_tests": [
+    "tests/golden/test_r3_document_formats.py",
+    "tests/unit/test_r3_chunk_methods.py",
+    "tests/security/test_r3_parser_limits.py",
+    "tests/e2e/test_r3_multiformat_ingestion.py"
+  ],
+  "source_reuse": "none"
+}

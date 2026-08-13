@@ -7,7 +7,7 @@ import json
 import os
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from rag_platform.compatibility.contracts import (
@@ -67,6 +67,36 @@ class R2MinimumNewDriver:
                 "implementation_status": "minimum_subset_implemented",
                 "stage": "R2",
                 "evidence": "tests/e2e/test_r2_minimum_rag.py",
+            },
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class R3NewDriver:
+    """Overlay completed R3 compiler capabilities on the R2 minimum driver."""
+
+    r3_status: Mapping[str, str] = field(
+        default_factory=lambda: {
+            "CAP-01": "implemented",
+            "CAP-02": "implemented",
+            "CAP-03": "implemented",
+            "CAP-04": "implemented",
+            "CAP-35": "parsing_foundation_implemented",
+        }
+    )
+
+    def invoke(self, request: DriverRequest) -> DriverResult:
+        status = self.r3_status.get(request.capability_id)
+        if status is None:
+            return R2MinimumNewDriver().invoke(request)
+        return DriverResult(
+            status=DriverStatus.SUCCEEDED,
+            output={
+                "capability_id": request.capability_id,
+                "scenario_id": request.scenario_id,
+                "implementation_status": status,
+                "stage": "R3",
+                "evidence": "reports/r3/document-compiler.json",
             },
         )
 
