@@ -1,0 +1,95 @@
+{
+  "capabilities": {
+    "count": 43,
+    "first": "CAP-01",
+    "last": "CAP-43",
+    "legacy_status_counts": {
+      "deferred": 1,
+      "experimental_off": 6,
+      "implemented": 35,
+      "mixed": 1
+    },
+    "new_status_counts": {
+      "not_implemented_in_new_repo": 43
+    }
+  },
+  "contracts": {
+    "file_hash_semantics": "utf8_lf_v1",
+    "file_sha256": {
+      "baselines/r0/capabilities.yaml": "e34fd56319d21ebc411be70564c7e36f0c127cb66803f62b63f3f420406095d6",
+      "baselines/r0/evidence-manifest.json": "7e423e5e40487ea0061dcbb8f1ef5830c4804d985055b4271f7286d964175c45",
+      "baselines/r0/openapi.json": "8e3e9112a583ed130f807db0c6b3d889ee87b260393e9c42e1a235a3ca6267a9",
+      "baselines/r0/reference-lock.json": "cfb6fd8c8974bbab31a65e263a452d27d30765b7f92934ab968cf8b14514a411",
+      "baselines/r0/scenarios.jsonl": "51ab911ef0bf8187e7cc28fafbf9212fdbe7c3efce36b428e436812d1e8aa5e4",
+      "docs/architecture.md": "94dc00db2691a5e1e58fe87167778bed74a5795f1d12f6bea7342f72928f792e",
+      "docs/compatibility-and-reuse.md": "ee4cccf2866977835f43b7cd0e2768f830d36061cc98ac02df6f8c9d2851b98e",
+      "docs/implementation-roadmap.md": "8b9de5e561a371d65fa07c09b5809f6b2691395583c9b786490eb80c0c83971d",
+      "docs/phases/r0-compatibility-baseline.md": "1d21b5671a2a506c39ea924744afcc0e1058be25f6260a29c245a1fbf9065c98",
+      "docs/reuse-register.yaml": "bf050f2ff3049af789e67150768c6a440db3d092698e58637c7aed22b4ab85c7",
+      "pyproject.toml": "5941155d64c28a7bd703c5fab2824e9252b3052a2725a02d2c2a45fc03449dd6"
+    }
+  },
+  "generated_at": "2026-08-13",
+  "greenfield": {
+    "copied_legacy_tree": false,
+    "legacy_production_dependency": false,
+    "legacy_runtime_fallback": false,
+    "reuse_entries": 0
+  },
+  "limitations": [
+    "No business capability is implemented in the new repository at R0.",
+    "Behavior probes beyond reference metadata are installed incrementally by target stage.",
+    "Legacy implemented status is evidence context, not inherited new-project completion."
+  ],
+  "next_stage": "R1",
+  "reference": {
+    "commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+    "commit_date": "2026-08-01T05:05:57Z",
+    "evidence": {
+      "alembic_heads": [
+        "20260801_0006"
+      ],
+      "capability_matrix_blob": "1540d130342e4c4a137a5035c3489f10d55fc59b",
+      "evaluation_tests_tree": "67ef356145a83c91846059d2d0e6803cdba9ec6e",
+      "golden_tests_tree": "d8db635148688dbf616091185c3c0234789b787d",
+      "openapi_path_count": 22,
+      "openapi_sha256": "3b8a5db4ae03c889cc87c4c535e3aaaf1bc5801bfec1e437a3ce95219eb2e459",
+      "pyproject_blob": "dd42d397d69ff886b1d05d8ed6049f9976b6c32e",
+      "reports_tree": "c13aa584faf2fc2fdefbaae6eb716da4e4f26ad6",
+      "test_file_count": 108,
+      "tests_tree": "2be126eaccee7004eefc6ad67d3b8838c21facd6"
+    },
+    "isolation": {
+      "dirty_checkout_allowed": false,
+      "driver_mode": "detached_checkout_or_container",
+      "production_dependency_allowed": false,
+      "runtime_fallback_allowed": false
+    },
+    "python": "3.13",
+    "repository": "https://github.com/haonanhu02-jpg/ragflow-agent",
+    "schema_version": 1,
+    "tree": "862b341cb6ad06796eea555c9e16007256a30695"
+  },
+  "report_id": "rag-greenfield-r0-baseline",
+  "scenarios": {
+    "capability_count": 43,
+    "comparator_counts": {
+      "exact": 5,
+      "numeric": 1,
+      "ranking": 4,
+      "security_negative": 3,
+      "semantic": 6,
+      "set": 2,
+      "state_sequence": 9,
+      "structured": 13
+    },
+    "count": 43
+  },
+  "schema_version": 1,
+  "source": {
+    "branch": "agent/r0-compatibility-baseline",
+    "commit": "493ad52d2770fc77ac7449e29061a62d271d2fe8"
+  },
+  "stage": "R0",
+  "status": "completed"
+}

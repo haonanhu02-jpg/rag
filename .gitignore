@@ -3,8 +3,12 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest-results.xml
+.coverage
+coverage.xml
 .mypy_cache/
 .ruff_cache/
+.r0-reference/
 dist/
 build/
 *.egg-info/

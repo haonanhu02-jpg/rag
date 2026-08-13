@@ -1,0 +1,358 @@
+schema_version: 1
+baseline_id: rag-greenfield-r0
+reference_lock: baselines/r0/reference-lock.json
+new_repository_default_status: not_implemented_in_new_repo
+
+contract_profiles:
+  document_compilation:
+    inputs: [tenant_scope, knowledge_base, document_bytes, media_type, compiler_options]
+    outputs: [parsed_blocks, chunks, stable_ids, source_locations, warnings]
+    invariants: [deterministic_order, stable_identity, bounded_resources, source_provenance]
+    errors: [unsupported_format, malformed_document, resource_limit, dependency_failure]
+    security: [tenant_scope_required, archive_bomb_rejected, untrusted_input_isolated]
+    performance: [page_limit, byte_limit, timeout, memory_budget]
+  knowledge_enrichment:
+    inputs: [authorized_chunks, model_profile, feature_flag, budget]
+    outputs: [derived_knowledge, provenance, cost, decision]
+    invariants: [source_bound, version_bound, deterministic_when_model_free]
+    errors: [invalid_model_output, budget_exhausted, dependency_failure]
+    security: [tenant_scope_required, source_authorization_preserved]
+    performance: [token_budget, call_budget, timeout]
+  retrieval:
+    inputs: [authorization_context, knowledge_base_scope, query, filter, limits]
+    outputs: [candidates, score_breakdown, evidence_state, trace_id]
+    invariants: [hard_scope_never_relaxed, active_version_only, deterministic_ties]
+    errors: [invalid_filter, dependency_failure, model_output_invalid]
+    security: [cross_tenant_denied, acl_enforced, deleted_content_hidden]
+    performance: [top_k_bound, rerank_window_bound, timeout]
+  grounded_answer:
+    inputs: [authorization_context, question, conversation, retrieval_options]
+    outputs: [answer, evidence_state, citations, trace_id, stream_events]
+    invariants: [citation_source_bound, no_evidence_is_not_error, authorized_evidence_only]
+    errors: [model_failure, retrieval_failure, budget_exhausted, cancelled]
+    security: [cross_tenant_denied, citation_revalidated, sensitive_trace_minimized]
+    performance: [token_budget, model_timeout, total_timeout]
+  lifecycle:
+    inputs: [authorization_context, document_command, idempotency_key, expected_revision]
+    outputs: [document_version, operation, progress, terminal_state]
+    invariants: [immutable_versions, one_active_version, idempotent_effects, authority_in_postgres]
+    errors: [conflict, transient_failure, permanent_failure, cancelled, dead_letter]
+    security: [write_permission_required, delete_immediately_hidden, tenant_scoped_messages]
+    performance: [bounded_retry, bounded_batch, reconciliation_limit]
+  agent_runtime:
+    inputs: [authorization_context, run_request, registered_tools, server_budget]
+    outputs: [run_state, answer, citations, approval, trace]
+    invariants: [bounded_loops, resumable_state, idempotent_side_effects, shared_retrieval_core]
+    errors: [tool_denied, approval_expired, budget_exhausted, state_version_unsupported]
+    security: [model_cannot_set_scope, tool_allowlist, resume_reauthorization, memory_consent]
+    performance: [iteration_budget, tool_budget, token_budget, active_runtime_budget]
+  platform_governance:
+    inputs: [configuration, artifact, dataset, operational_command]
+    outputs: [public_contract, metrics, audit_evidence, release_decision]
+    invariants: [reproducible_build, explicit_limitations, database_is_authority]
+    errors: [invalid_configuration, migration_failure, gate_failure, recovery_failure]
+    security: [secret_hygiene, least_privilege, supply_chain_evidence]
+    performance: [capacity_thresholds, slo_measurement, recovery_targets]
+
+capabilities:
+  - id: CAP-01
+    name: 多格式文档解析
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R3
+    contract_profile: document_compilation
+    acceptance: [CAP-01-BASELINE]
+  - id: CAP-02
+    name: OCR 与版面分析
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R3
+    contract_profile: document_compilation
+    acceptance: [CAP-02-BASELINE]
+  - id: CAP-03
+    name: 统一文档结构
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R3
+    contract_profile: document_compilation
+    acceptance: [CAP-03-BASELINE]
+  - id: CAP-04
+    name: 场景化 Chunk Method
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R3
+    contract_profile: document_compilation
+    acceptance: [CAP-04-BASELINE]
+  - id: CAP-05
+    name: Chunk 自动关键词
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-05-BASELINE]
+  - id: CAP-06
+    name: Chunk 自动问题
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-06-BASELINE]
+  - id: CAP-07
+    name: 摘要、标题与 TOC
+    legacy_status: mixed
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-07-BASELINE]
+  - id: CAP-08
+    name: Embedding 与索引写入
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R2
+    contract_profile: lifecycle
+    acceptance: [CAP-08-BASELINE]
+  - id: CAP-09
+    name: 全文检索
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-09-BASELINE]
+  - id: CAP-10
+    name: 向量检索
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-10-BASELINE]
+  - id: CAP-11
+    name: 混合检索
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-11-BASELINE]
+  - id: CAP-12
+    name: 查询改写与独立问题生成
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-12-BASELINE]
+  - id: CAP-13
+    name: 跨语言查询
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-13-BASELINE]
+  - id: CAP-14
+    name: 关键词扩展
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-14-BASELINE]
+  - id: CAP-15
+    name: 元数据过滤
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-15-BASELINE]
+  - id: CAP-16
+    name: 权限过滤
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-16-BASELINE]
+  - id: CAP-17
+    name: 空结果降级
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R5
+    contract_profile: grounded_answer
+    acceptance: [CAP-17-BASELINE]
+  - id: CAP-18
+    name: 候选清理与去重
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-18-BASELINE]
+  - id: CAP-19
+    name: Reranker
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-19-BASELINE]
+  - id: CAP-20
+    name: 分数融合、阈值与 TopK/TopN
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-20-BASELINE]
+  - id: CAP-21
+    name: 引用与来源定位
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R5
+    contract_profile: grounded_answer
+    acceptance: [CAP-21-BASELINE]
+  - id: CAP-22
+    name: Retrieval Trace
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R4
+    contract_profile: retrieval
+    acceptance: [CAP-22-BASELINE]
+  - id: CAP-23
+    name: 文档上传与解析任务
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R6
+    contract_profile: lifecycle
+    acceptance: [CAP-23-BASELINE]
+  - id: CAP-24
+    name: 文档更新与重新解析
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R6
+    contract_profile: lifecycle
+    acceptance: [CAP-24-BASELINE]
+  - id: CAP-25
+    name: 文档删除与索引同步
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R6
+    contract_profile: lifecycle
+    acceptance: [CAP-25-BASELINE]
+  - id: CAP-26
+    name: 任务重试、取消与幂等
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R6
+    contract_profile: lifecycle
+    acceptance: [CAP-26-BASELINE]
+  - id: CAP-27
+    name: 固定 RAG 问答
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R5
+    contract_profile: grounded_answer
+    acceptance: [CAP-27-BASELINE]
+  - id: CAP-28
+    name: KnowledgeBaseTool
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R7
+    contract_profile: agent_runtime
+    acceptance: [CAP-28-BASELINE]
+  - id: CAP-29
+    name: LangGraph 状态、路由与循环
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R7
+    contract_profile: agent_runtime
+    acceptance: [CAP-29-BASELINE]
+  - id: CAP-30
+    name: Checkpoint 与运行恢复
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R7
+    contract_profile: agent_runtime
+    acceptance: [CAP-30-BASELINE]
+  - id: CAP-31
+    name: Human-in-the-loop
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R7
+    contract_profile: agent_runtime
+    acceptance: [CAP-31-BASELINE]
+  - id: CAP-32
+    name: 多 Agent 协作
+    legacy_status: deferred
+    new_status: not_implemented_in_new_repo
+    target_stage: R7
+    contract_profile: agent_runtime
+    acceptance: [CAP-32-BASELINE]
+  - id: CAP-33
+    name: GraphRAG
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-33-BASELINE]
+  - id: CAP-34
+    name: RAPTOR
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-34-BASELINE]
+  - id: CAP-35
+    name: 多模态 RAG
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-35-BASELINE]
+  - id: CAP-36
+    name: 模型注册与调用
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R1
+    contract_profile: platform_governance
+    acceptance: [CAP-36-BASELINE]
+  - id: CAP-37
+    name: FastAPI 服务接口
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R1
+    contract_profile: platform_governance
+    acceptance: [CAP-37-BASELINE]
+  - id: CAP-38
+    name: 后台任务与 Ingestion 执行
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R6
+    contract_profile: lifecycle
+    acceptance: [CAP-38-BASELINE]
+  - id: CAP-39
+    name: 评测与回归门禁
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R9
+    contract_profile: platform_governance
+    acceptance: [CAP-39-BASELINE]
+  - id: CAP-40
+    name: 日志、指标与链路追踪
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R9
+    contract_profile: platform_governance
+    acceptance: [CAP-40-BASELINE]
+  - id: CAP-41
+    name: 权限与安全
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R9
+    contract_profile: platform_governance
+    acceptance: [CAP-41-BASELINE]
+  - id: CAP-42
+    name: 生产部署、备份与恢复
+    legacy_status: implemented
+    new_status: not_implemented_in_new_repo
+    target_stage: R9
+    contract_profile: platform_governance
+    acceptance: [CAP-42-BASELINE]
+  - id: CAP-43
+    name: 时序 RAG
+    legacy_status: experimental_off
+    new_status: not_implemented_in_new_repo
+    target_stage: R8
+    contract_profile: knowledge_enrichment
+    acceptance: [CAP-43-BASELINE]

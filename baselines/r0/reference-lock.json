@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/haonanhu02-jpg/ragflow-agent",
+  "commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "commit_date": "2026-08-01T05:05:57Z",
+  "tree": "862b341cb6ad06796eea555c9e16007256a30695",
+  "python": "3.13",
+  "evidence": {
+    "pyproject_blob": "dd42d397d69ff886b1d05d8ed6049f9976b6c32e",
+    "capability_matrix_blob": "1540d130342e4c4a137a5035c3489f10d55fc59b",
+    "tests_tree": "2be126eaccee7004eefc6ad67d3b8838c21facd6",
+    "golden_tests_tree": "d8db635148688dbf616091185c3c0234789b787d",
+    "evaluation_tests_tree": "67ef356145a83c91846059d2d0e6803cdba9ec6e",
+    "reports_tree": "c13aa584faf2fc2fdefbaae6eb716da4e4f26ad6",
+    "test_file_count": 108,
+    "alembic_heads": ["20260801_0006"],
+    "openapi_path_count": 22,
+    "openapi_sha256": "3b8a5db4ae03c889cc87c4c535e3aaaf1bc5801bfec1e437a3ce95219eb2e459"
+  },
+  "isolation": {
+    "production_dependency_allowed": false,
+    "runtime_fallback_allowed": false,
+    "driver_mode": "detached_checkout_or_container",
+    "dirty_checkout_allowed": false
+  }
+}
