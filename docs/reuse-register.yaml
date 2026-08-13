@@ -1,0 +1,4 @@
+schema_version: 1
+source_repository: https://github.com/haonanhu02-jpg/ragflow-agent
+policy_document: docs/compatibility-and-reuse.md
+entries: []
