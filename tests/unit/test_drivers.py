@@ -10,6 +10,7 @@ from rag_platform.compatibility import (
     DriverRequest,
     DriverStatus,
     NotImplementedNewDriver,
+    R2MinimumNewDriver,
     SubprocessDriver,
 )
 from rag_platform.compatibility.drivers import DriverProtocolError
@@ -41,6 +42,18 @@ def test_subprocess_driver_round_trips_json_protocol() -> None:
     assert result.status is DriverStatus.NOT_IMPLEMENTED
     assert result.error is not None
     assert result.error["capability_id"] == "CAP-01"
+
+
+def test_r2_driver_reports_only_minimum_subset_evidence() -> None:
+    driver = R2MinimumNewDriver()
+
+    implemented = driver.invoke(DriverRequest("CAP-27", "CAP-27-BASELINE"))
+    remaining = driver.invoke(DriverRequest("CAP-28", "CAP-28-BASELINE"))
+
+    assert implemented.status is DriverStatus.SUCCEEDED
+    assert isinstance(implemented.output, dict)
+    assert implemented.output["implementation_status"] == "minimum_subset_implemented"
+    assert remaining.status is DriverStatus.NOT_IMPLEMENTED
 
 
 def test_subprocess_driver_reports_timeout(tmp_path: Path) -> None:
@@ -82,7 +95,7 @@ def test_subprocess_driver_rejects_invalid_protocol(tmp_path: Path) -> None:
     [
         "print('[]')\n",
         "print('{\"output\": null}')\n",
-        "print('{\"status\": \"succeeded\", \"error\": []}')\n",
+        'print(\'{"status": "succeeded", "error": []}\')\n',
     ],
 )
 def test_subprocess_driver_rejects_invalid_json_shapes(tmp_path: Path, body: str) -> None:
@@ -99,6 +112,4 @@ def test_driver_result_is_json_serializable() -> None:
         DriverRequest("CAP-43", "CAP-43-BASELINE", {"probe": "temporal_rag"})
     )
 
-    assert json.loads(json.dumps(result.as_json()))["status"] == (
-        "not_implemented_in_new_repo"
-    )
+    assert json.loads(json.dumps(result.as_json()))["status"] == ("not_implemented_in_new_repo")

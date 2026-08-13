@@ -68,4 +68,3 @@ def test_postgres_repository_contract(
     postgres_repository: PostgresKnowledgeBaseRepository,
 ) -> None:
     assert_repository_contract(postgres_repository)
-

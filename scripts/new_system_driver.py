@@ -1,4 +1,4 @@
-"""CLI entrypoint for the new system driver; truthful R0 implementation."""
+"""CLI entrypoint for the new system driver; truthful through R2."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import sys
 
 from rag_platform.compatibility.contracts import DriverRequest
-from rag_platform.compatibility.drivers import NotImplementedNewDriver
+from rag_platform.compatibility.drivers import R2MinimumNewDriver
 
 
 def main() -> int:
@@ -16,11 +16,10 @@ def main() -> int:
         scenario_id=raw["scenario_id"],
         payload=raw.get("payload", {}),
     )
-    result = NotImplementedNewDriver().invoke(request)
+    result = R2MinimumNewDriver().invoke(request)
     print(json.dumps(result.as_json(), ensure_ascii=False))
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -16,7 +16,7 @@ jobs:
       RAG_TEST_DATABASE_URL: postgresql+psycopg://rag:rag@localhost:5432/rag_test
     services:
       postgres:
-        image: postgres:17-alpine
+        image: pgvector/pgvector:0.8.6-pg17
         env:
           POSTGRES_USER: rag
           POSTGRES_PASSWORD: rag
@@ -55,6 +55,8 @@ jobs:
         run: uv run python scripts/check_r0_baseline.py
       - name: R1 foundation gate
         run: uv run python scripts/check_r1_foundation.py
+      - name: R2 minimum RAG gate
+        run: uv run python scripts/check_r2_vertical_slice.py
       - name: Tests
         run: uv run pytest -q --cov --cov-report=term-missing
       - name: Dependency audit

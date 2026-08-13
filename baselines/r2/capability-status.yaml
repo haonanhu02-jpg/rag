@@ -1,0 +1,29 @@
+schema_version: 1
+stage: R2
+reference_commit: ce74c58e664275ff239bcbb8c841771bc4649557
+status_vocabulary:
+  - minimum_subset_implemented
+  - not_implemented_in_new_repo
+capabilities:
+  CAP-03: minimum_subset_implemented
+  CAP-04: minimum_subset_implemented
+  CAP-08: minimum_subset_implemented
+  CAP-10: minimum_subset_implemented
+  CAP-16: minimum_subset_implemented
+  CAP-21: minimum_subset_implemented
+  CAP-22: minimum_subset_implemented
+  CAP-23: minimum_subset_implemented
+  CAP-27: minimum_subset_implemented
+  CAP-38: minimum_subset_implemented
+remaining_capabilities: not_implemented_in_new_repo
+limitations:
+  CAP-03: TXT/Markdown pure-text blocks only; full format compiler is R3.
+  CAP-04: General character-bounded chunks only; nine methods are R3.
+  CAP-08: Deterministic embedding and pgvector candidate publication; lifecycle hardening is R6.
+  CAP-10: Vector-only retrieval; hybrid retrieval is R4.
+  CAP-16: Trusted tenant and KB hard filters; full ACL policy is R4.
+  CAP-21: Text source location only; page/bbox/media citations are R5.
+  CAP-22: Basic authorization/result trace only; detailed stage trace and TTL are R4.
+  CAP-23: Upload/job/immutable version minimum; lifecycle operations are R6.
+  CAP-27: Non-streaming answer/no-evidence only; full evidence validation and streaming are R5.
+  CAP-38: One-job worker execution; durable queue/outbox/retry/cancel are R6.
