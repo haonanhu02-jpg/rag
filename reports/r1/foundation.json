@@ -1,0 +1,39 @@
+{
+  "evidence": {
+    "cross_tenant_negative_tests": true,
+    "fake_and_langchain_contract": true,
+    "fake_and_postgres_repository_contract": true,
+    "postgres_migration_round_trip": true,
+    "r0_baseline_preserved": true,
+    "trusted_context_negative_tests": true
+  },
+  "generated_at": "2026-08-13",
+  "next_stage": "R2",
+  "report_id": "rag-greenfield-r1-foundation",
+  "schema_version": 1,
+  "scope": {
+    "business_rag_implemented": false,
+    "capability_foundations": [
+      "CAP-36",
+      "CAP-37",
+      "CAP-41"
+    ],
+    "composition_roots": [
+      "api",
+      "worker",
+      "maintainer"
+    ],
+    "domain_framework_dependencies": 0,
+    "model_runtime_operations": [
+      "chat",
+      "embedding",
+      "rerank"
+    ]
+  },
+  "source": {
+    "commit": "1e98bd90695115366657e60cade748a2c38a9a08"
+  },
+  "stage": "R1",
+  "status": "completed"
+}
+

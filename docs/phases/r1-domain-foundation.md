@@ -1,0 +1,36 @@
+---
+document_id: RAG-R1-DOMAIN-FOUNDATION
+status: completed
+last_updated_at: "2026-08-13"
+---
+
+# R1：领域核心、ModelRuntime 与基础设施骨架
+
+## 范围
+
+R1 建立后续 RAG 能力依赖的稳定核心，不实现 R2 的文档上传、切块、向量索引、检索或问答。
+
+## 交付
+
+| 项目 | 实现 |
+|---|---|
+| 领域语言 | Tenant、KnowledgeBase、Document/Version、Block、Chunk、IndexVersion、RetrievalCandidate、Citation、Trace、Job、Operation、AgentRun 及不变量 |
+| 可信授权 | `TrustedPrincipal → AuthorizationContext` 唯一构造路径；拒绝请求体、模型和 Tool 注入 tenant/actor/role/ACL/scope |
+| CorePolicies | tenant/KB 范围、角色、敏感字段脱敏、预算、稳定错误分类和 fail-closed 策略 |
+| ModelRuntime | Chat、Embedding、Reranker 统一 Interface；Fake 与 LangChain Adapter；结构化输出、超时、有限重试、token/成本记录 |
+| 基础端口 | PostgreSQL Repository/Transaction、对象存储、搜索、队列、Clock、ID Interface；有契约价值的 Fake/真实实现 |
+| 进程入口 | `rag-api`、`rag-worker`、`rag-maintainer`，均支持独立 `--check`；API 提供 live/ready 健康接口 |
+| 数据库 | Alembic 首迁移：tenant、KB、document/version identity、model registration metadata、audit foundation |
+
+## 验收证据
+
+- Domain 与 Modules 零框架依赖；LangChain 仅存在于出站 Adapter。
+- FakeModelRuntime 与 LangChainModelRuntime 通过同一 Interface 契约。
+- InMemory 与真实 PostgreSQL KnowledgeBase Repository 通过同一 Interface 契约。
+- Alembic 在真实 PostgreSQL 执行 `base → head → base → head`。
+- 跨 tenant 查询返回不可见；外部安全字段覆盖被拒绝。
+- 三个进程入口 `--check` 成功，配置不合法时 fail-closed。
+- R0 固定基线数据保持不变；R1 不虚报完整业务兼容。
+
+机器证据见 `reports/r1/foundation.json`。该报告的 source commit 指向 R1 实现提交，报告本身在
+后续证据提交中冻结。

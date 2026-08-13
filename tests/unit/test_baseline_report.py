@@ -47,3 +47,28 @@ def test_frozen_report_rejects_contract_drift() -> None:
 
     with pytest.raises(BaselineError, match="frozen report drift in contracts"):
         verify_frozen_report(report, frozen)
+
+
+def test_frozen_report_allows_post_r0_project_files_to_evolve() -> None:
+    report = build_report(Path.cwd())
+    frozen = dict(report)
+    contracts = dict(report["contracts"])
+    hashes = dict(contracts["file_sha256"])
+    hashes["pyproject.toml"] = "r0-frozen-project-file"
+    contracts["file_sha256"] = hashes
+    frozen["contracts"] = contracts
+
+    verify_frozen_report(report, frozen)
+
+
+def test_frozen_report_rejects_immutable_r0_data_drift() -> None:
+    report = build_report(Path.cwd())
+    frozen = dict(report)
+    contracts = dict(report["contracts"])
+    hashes = dict(contracts["file_sha256"])
+    hashes["baselines/r0/reference-lock.json"] = "changed"
+    contracts["file_sha256"] = hashes
+    frozen["contracts"] = contracts
+
+    with pytest.raises(BaselineError, match=r"reference-lock\.json"):
+        verify_frozen_report(report, frozen)

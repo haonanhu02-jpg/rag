@@ -7,15 +7,13 @@ import ast
 import json
 from pathlib import Path
 
-FORBIDDEN_PRODUCTION_MODULES = {
-    "ragflow_agent",
+FORBIDDEN_PRODUCTION_MODULES = {"ragflow_agent"}
+FRAMEWORK_MODULES = {
+    "fastapi",
     "langchain",
     "langchain_core",
     "langchain_openai",
     "langgraph",
-}
-FORBIDDEN_DOMAIN_MODULES = FORBIDDEN_PRODUCTION_MODULES | {
-    "fastapi",
     "sqlalchemy",
     "pydantic",
     "pydantic_settings",
@@ -24,6 +22,7 @@ FORBIDDEN_DOMAIN_MODULES = FORBIDDEN_PRODUCTION_MODULES | {
     "boto3",
     "arq",
 }
+FORBIDDEN_DOMAIN_MODULES = FORBIDDEN_PRODUCTION_MODULES | FRAMEWORK_MODULES
 LEGACY_MARKERS = (
     "src/ragflow_agent/",
     "ragflow_agent.",
@@ -72,11 +71,17 @@ def check_architecture(root: Path) -> list[str]:
     for path in sorted(source_root.rglob("*.py")):
         relative = path.relative_to(root).as_posix()
         imports = {_top_level(module) for module in _imports(path)}
-        forbidden = (
-            FORBIDDEN_DOMAIN_MODULES
-            if "domain" in path.parts
-            else FORBIDDEN_PRODUCTION_MODULES
-        )
+        package_parts = path.relative_to(source_root).parts
+        boundary = package_parts[0] if package_parts else ""
+        forbidden = set(FORBIDDEN_PRODUCTION_MODULES)
+        if boundary in {"domain", "modules"}:
+            forbidden |= FRAMEWORK_MODULES
+        elif boundary == "orchestration":
+            forbidden |= FRAMEWORK_MODULES - {"langgraph"}
+        elif package_parts[:2] == ("adapters", "inbound"):
+            forbidden |= FRAMEWORK_MODULES - {"fastapi", "pydantic"}
+        elif package_parts[:2] == ("adapters", "outbound"):
+            forbidden |= {"fastapi", "langgraph", "pydantic_settings"}
         unexpected = sorted(imports & forbidden)
         if unexpected:
             violations.append(f"{relative}: forbidden imports {unexpected}")

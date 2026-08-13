@@ -32,6 +32,9 @@ BASELINE_FILES = (
     "docs/reuse-register.yaml",
     "pyproject.toml",
 )
+IMMUTABLE_R0_FILES = tuple(
+    path for path in BASELINE_FILES if path.startswith("baselines/r0/")
+)
 
 
 class BaselineError(RuntimeError):
@@ -143,7 +146,6 @@ def verify_frozen_report(report: dict[str, Any], frozen: dict[str, Any]) -> None
         "reference",
         "capabilities",
         "scenarios",
-        "contracts",
         "greenfield",
         "next_stage",
         "limitations",
@@ -151,6 +153,17 @@ def verify_frozen_report(report: dict[str, Any], frozen: dict[str, Any]) -> None
     for section in stable_sections:
         if frozen.get(section) != report.get(section):
             raise BaselineError(f"frozen report drift in {section}")
+    current_contracts = cast(dict[str, Any], report["contracts"])
+    frozen_contracts = cast(dict[str, Any], frozen.get("contracts", {}))
+    if current_contracts.get("file_hash_semantics") != frozen_contracts.get(
+        "file_hash_semantics"
+    ):
+        raise BaselineError("frozen report drift in contracts")
+    current_hashes = cast(dict[str, str], current_contracts.get("file_sha256", {}))
+    frozen_hashes = cast(dict[str, str], frozen_contracts.get("file_sha256", {}))
+    for relative in IMMUTABLE_R0_FILES:
+        if current_hashes.get(relative) != frozen_hashes.get(relative):
+            raise BaselineError(f"frozen report drift in contracts: {relative}")
 
 
 def main() -> int:

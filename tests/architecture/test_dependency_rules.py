@@ -5,7 +5,7 @@ from pathlib import Path
 from scripts.check_architecture import check_architecture
 
 
-def test_production_source_has_no_legacy_or_framework_dependency() -> None:
+def test_production_source_respects_framework_boundaries() -> None:
     assert check_architecture(Path.cwd()) == []
 
 
@@ -22,6 +22,30 @@ def test_domain_framework_import_is_rejected(tmp_path: Path) -> None:
     assert violations == ["src/rag_platform/domain/bad.py: forbidden imports ['langgraph']"]
 
 
+def test_module_framework_import_is_rejected(tmp_path: Path) -> None:
+    source = tmp_path / "src/rag_platform/modules"
+    source.mkdir(parents=True)
+    (source / "bad.py").write_text("import langchain_core\n", encoding="utf-8")
+    register = tmp_path / "docs"
+    register.mkdir()
+    (register / "reuse-register.yaml").write_text("entries: []\n", encoding="utf-8")
+
+    assert check_architecture(tmp_path) == [
+        "src/rag_platform/modules/bad.py: forbidden imports ['langchain_core']"
+    ]
+
+
+def test_langchain_import_is_allowed_only_in_outbound_adapter(tmp_path: Path) -> None:
+    source = tmp_path / "src/rag_platform/adapters/outbound"
+    source.mkdir(parents=True)
+    (source / "model.py").write_text("import langchain_core\n", encoding="utf-8")
+    register = tmp_path / "docs"
+    register.mkdir()
+    (register / "reuse-register.yaml").write_text("entries: []\n", encoding="utf-8")
+
+    assert check_architecture(tmp_path) == []
+
+
 def test_unregistered_copied_source_marker_is_rejected(tmp_path: Path) -> None:
     source = tmp_path / "src/rag_platform/modules"
     source.mkdir(parents=True)
@@ -35,4 +59,3 @@ def test_unregistered_copied_source_marker_is_rejected(tmp_path: Path) -> None:
     assert violations == [
         "src/rag_platform/modules/copied.py: copied-source marker without reuse register entry"
     ]
-

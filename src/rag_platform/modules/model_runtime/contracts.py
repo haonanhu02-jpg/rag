@@ -1,0 +1,168 @@
+"""Provider-neutral model contracts owned by the ModelRuntime module."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import StrEnum
+from types import MappingProxyType
+from typing import Protocol
+
+type JsonScalar = bool | int | float | str | None
+type JsonValue = JsonScalar | list[JsonValue] | dict[str, JsonValue]
+
+
+class ModelKind(StrEnum):
+    CHAT = "chat"
+    EMBEDDING = "embedding"
+    RERANKER = "reranker"
+
+
+class ModelRuntimeError(RuntimeError):
+    pass
+
+
+class UnknownModel(ModelRuntimeError):
+    pass
+
+
+class ModelTimeout(ModelRuntimeError):
+    pass
+
+
+class InvalidModelOutput(ModelRuntimeError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class ModelRegistration:
+    id: str
+    provider: str
+    model_name: str
+    kind: ModelKind
+    input_cost_per_million: int = 0
+    output_cost_per_million: int = 0
+    enabled: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.id.strip() or not self.provider.strip() or not self.model_name.strip():
+            raise ValueError("model registration fields must not be empty")
+        if self.input_cost_per_million < 0 or self.output_cost_per_million < 0:
+            raise ValueError("model costs must not be negative")
+
+
+@dataclass(frozen=True, slots=True)
+class ChatMessage:
+    role: str
+    content: str
+
+    def __post_init__(self) -> None:
+        if self.role not in {"system", "user", "assistant", "tool"}:
+            raise ValueError("unsupported chat message role")
+
+
+@dataclass(frozen=True, slots=True)
+class InvocationPolicy:
+    timeout_seconds: float = 30.0
+    max_retries: int = 2
+
+    def __post_init__(self) -> None:
+        if self.timeout_seconds <= 0 or self.max_retries < 0:
+            raise ValueError("invalid invocation policy")
+
+
+@dataclass(frozen=True, slots=True)
+class ChatRequest:
+    model_id: str
+    messages: tuple[ChatMessage, ...]
+    structured_schema: Mapping[str, JsonValue] | None = None
+    policy: InvocationPolicy = InvocationPolicy()
+    metadata: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.messages:
+            raise ValueError("chat request requires messages")
+        if self.structured_schema is not None:
+            object.__setattr__(
+                self, "structured_schema", MappingProxyType(dict(self.structured_schema))
+            )
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingRequest:
+    model_id: str
+    texts: tuple[str, ...]
+    policy: InvocationPolicy = InvocationPolicy()
+
+    def __post_init__(self) -> None:
+        if not self.texts or any(not text for text in self.texts):
+            raise ValueError("embedding request requires non-empty texts")
+
+
+@dataclass(frozen=True, slots=True)
+class RerankRequest:
+    model_id: str
+    query: str
+    documents: tuple[str, ...]
+    top_n: int
+    policy: InvocationPolicy = InvocationPolicy()
+
+    def __post_init__(self) -> None:
+        if not self.query or not self.documents:
+            raise ValueError("rerank request requires query and documents")
+        if not 1 <= self.top_n <= len(self.documents):
+            raise ValueError("top_n must be within the document count")
+
+
+@dataclass(frozen=True, slots=True)
+class ModelUsage:
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_microunits: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+
+@dataclass(frozen=True, slots=True)
+class ChatResult:
+    model_id: str
+    text: str
+    structured: Mapping[str, JsonValue] | None
+    usage: ModelUsage
+    attempts: int
+    duration_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingResult:
+    model_id: str
+    vectors: tuple[tuple[float, ...], ...]
+    usage: ModelUsage
+    attempts: int
+    duration_ms: int
+
+
+@dataclass(frozen=True, slots=True)
+class RerankedItem:
+    document_index: int
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
+class RerankResult:
+    model_id: str
+    items: tuple[RerankedItem, ...]
+    usage: ModelUsage
+    attempts: int
+    duration_ms: int
+
+
+class ModelRuntime(Protocol):
+    def chat(self, request: ChatRequest) -> ChatResult: ...
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResult: ...
+
+    def rerank(self, request: RerankRequest) -> RerankResult: ...
