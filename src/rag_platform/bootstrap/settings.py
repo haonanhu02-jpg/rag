@@ -1,1 +1,36 @@
-"""Environment configuration validated at composition roots."""  from __future__ import annotations  import os from dataclasses import dataclass   class ConfigurationError(ValueError):     pass   @dataclass(frozen=True, slots=True) class Settings:     environment: str     database_url: str     log_level: str      @classmethod     def from_environment(cls) -> Settings:         environment = os.environ.get("RAG_ENVIRONMENT", "development")         database_url = os.environ.get(             "RAG_DATABASE_URL", "postgresql+psycopg://rag:rag@localhost:5432/rag"         )         log_level = os.environ.get("RAG_LOG_LEVEL", "INFO").upper()         settings = cls(environment, database_url, log_level)         settings.validate()         return settings      def validate(self) -> None:         if self.environment not in {"development", "test", "production"}:             raise ConfigurationError("RAG_ENVIRONMENT is invalid")         if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):             raise ConfigurationError("RAG_DATABASE_URL must use PostgreSQL")         if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:             raise ConfigurationError("RAG_LOG_LEVEL is invalid")
+"""Environment configuration validated at composition roots."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+
+class ConfigurationError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    environment: str
+    database_url: str
+    log_level: str
+
+    @classmethod
+    def from_environment(cls) -> Settings:
+        environment = os.environ.get("RAG_ENVIRONMENT", "development")
+        database_url = os.environ.get(
+            "RAG_DATABASE_URL", "postgresql+psycopg://rag:rag@localhost:5432/rag"
+        )
+        log_level = os.environ.get("RAG_LOG_LEVEL", "INFO").upper()
+        settings = cls(environment, database_url, log_level)
+        settings.validate()
+        return settings
+
+    def validate(self) -> None:
+        if self.environment not in {"development", "test", "production"}:
+            raise ConfigurationError("RAG_ENVIRONMENT is invalid")
+        if not self.database_url.startswith(("postgresql://", "postgresql+psycopg://")):
+            raise ConfigurationError("RAG_DATABASE_URL must use PostgreSQL")
+        if self.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise ConfigurationError("RAG_LOG_LEVEL is invalid")
