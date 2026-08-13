@@ -52,13 +52,20 @@ def build_report(root: Path) -> dict[str, Any]:
     )
     if legacy["source_reuse"] != "none" or len(legacy["observations"]) != 4:
         raise ValueError("R3 legacy evidence is incomplete")
+    source_commit = _git(root, "rev-parse", "HEAD")
+    frozen_path = root / "reports/r3/document-compiler.json"
+    if frozen_path.is_file():
+        frozen = json.loads(frozen_path.read_text(encoding="utf-8"))
+        frozen_commit = frozen.get("source", {}).get("commit")
+        if isinstance(frozen_commit, str) and frozen_commit:
+            source_commit = frozen_commit
     return {
         "schema_version": 1,
         "report_id": "rag-greenfield-r3-document-compiler",
         "stage": "R3",
         "status": "completed",
         "generated_at": "2026-08-13",
-        "source": {"commit": _git(root, "rev-parse", "HEAD")},
+        "source": {"commit": source_commit},
         "scope": {
             "capabilities": list(R3_CAPABILITIES),
             "document_formats": ["pdf", "docx", "pptx", "xlsx", "txt", "md", "html", "image"],
