@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import text
 
 from rag_platform.adapters.outbound.memory import InMemoryKnowledgeBaseRepository
@@ -38,6 +40,9 @@ def postgres_repository() -> Iterator[PostgresKnowledgeBaseRepository]:
     database_url = os.environ.get("RAG_TEST_DATABASE_URL")
     if database_url is None:
         pytest.skip("RAG_TEST_DATABASE_URL is required for the real adapter contract")
+    config = Config("alembic.ini")
+    config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
+    command.upgrade(config, "head")
     engine = create_postgres_engine(database_url)
     with engine.begin() as connection:
         connection.execute(
@@ -63,3 +68,4 @@ def test_postgres_repository_contract(
     postgres_repository: PostgresKnowledgeBaseRepository,
 ) -> None:
     assert_repository_contract(postgres_repository)
+
