@@ -5,7 +5,7 @@
   "status": "completed",
   "generated_at": "2026-08-14",
   "source": {
-    "commit": "PENDING_R6_IMPLEMENTATION_COMMIT"
+    "commit": "20a76a4b2ac1d01f47ea75177451e8143e2d2e7e"
   },
   "scope": {
     "capabilities": [
