@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "report_id": "rag-greenfield-r4-authorized-retrieval",
+  "stage": "R4",
+  "status": "completed",
+  "generated_at": "2026-08-14",
+  "source": {
+    "commit": "fbf05ac875f14d750872d47c900f391e321002b1"
+  },
+  "scope": {
+    "capabilities": [
+      "CAP-09",
+      "CAP-10",
+      "CAP-11",
+      "CAP-12",
+      "CAP-13",
+      "CAP-14",
+      "CAP-15",
+      "CAP-16",
+      "CAP-17",
+      "CAP-18",
+      "CAP-19",
+      "CAP-20",
+      "CAP-22"
+    ],
+    "channels": [
+      "elasticsearch_bm25",
+      "elasticsearch_knn"
+    ],
+    "fusion": "application_rrf_k60",
+    "final_authority": "postgresql",
+    "shared_boundary": "AuthorizedRetrieval",
+    "langgraph_online_hot_path": false
+  },
+  "evidence": {
+    "legacy_behavior_observations": 5,
+    "real_elasticsearch_bm25_knn": true,
+    "postgresql_authority_revalidation": true,
+    "cross_tenant_wrong_kb_unpublished_deleted_negative": true,
+    "recursive_filter_ast_complexity_bound": true,
+    "canonical_query_failure_fallback": true,
+    "hybrid_recall_non_regression": true,
+    "rrf_rerank_threshold_topn_document_quota": true,
+    "finite_fallback_preserves_hard_and_user_filters": true,
+    "dependency_failure_separate_from_no_evidence": true,
+    "content_free_role_scoped_ttl_trace": true,
+    "trace_write_failure_nonblocking_metric": true,
+    "source_reuse": "none"
+  },
+  "migration_head": "20260814_0004",
+  "next_stage": "R5"
+}

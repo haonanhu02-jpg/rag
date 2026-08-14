@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "reference_commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "observations": [
+    {
+      "behavior": "query_normalization_rewrite_translation_and_keyword_failure_fallback",
+      "path": "src/ragflow_agent/knowledge/application/query/preprocess.py",
+      "git_blob": "cea0801ac568e8b499ea9f21aa6e5b6ac24e6e1d"
+    },
+    {
+      "behavior": "recursive_filter_ast_and_finite_hard_scope_preserving_fallback",
+      "path": "tests/unit/retrieval/test_filters_and_fallback.py",
+      "git_blob": "8c147c599fab7c667b704bb8c5746095b1ca7d02"
+    },
+    {
+      "behavior": "bm25_knn_rrf_and_reranker_degradation",
+      "path": "tests/unit/retrieval/test_fusion_rerank.py",
+      "git_blob": "781a8186ba7fb7d8fdda82b1721ca33a50192513"
+    },
+    {
+      "behavior": "real_elasticsearch_hybrid_retrieval_with_authorization_filters",
+      "path": "tests/integration/search/test_phase06_retrieval.py",
+      "git_blob": "d2dee3be5a4560e72e049ce1ada3b9b4e867d28d"
+    },
+    {
+      "behavior": "content_free_retrieval_trace_persistence",
+      "path": "tests/integration/database/test_retrieval_trace_store.py",
+      "git_blob": "226034beb89979eff2d4fe1bebd624d816e99325"
+    }
+  ],
+  "new_system_tests": [
+    "tests/unit/test_r4_query_and_filters.py",
+    "tests/unit/test_r4_ranking.py",
+    "tests/unit/test_r4_retrieval_service.py",
+    "tests/integration/test_r4_elasticsearch.py",
+    "tests/e2e/test_r2_minimum_rag.py"
+  ],
+  "source_reuse": "none"
+}

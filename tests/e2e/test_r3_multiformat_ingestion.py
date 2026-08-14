@@ -31,7 +31,13 @@ def r3_client(tmp_path: Path) -> Iterator[tuple[TestClient, R2Runtime]]:
     command.downgrade(config, "base")
     command.upgrade(config, "head")
     runtime_settings = Settings(
-        "test", database_url, "INFO", str(tmp_path / "objects"), 10 * 1024 * 1024
+        "test",
+        database_url,
+        "INFO",
+        str(tmp_path / "objects"),
+        10 * 1024 * 1024,
+        os.environ.get("RAG_TEST_ELASTICSEARCH_URL", "http://localhost:9200"),
+        f"rag-r3-test-{tmp_path.name}".lower(),
     )
     runtime = R2Runtime(runtime_settings, ocr=StaticOcr())
     with TestClient(create_app(settings=runtime_settings, runtime=runtime)) as client:
@@ -93,9 +99,7 @@ def test_parser_resource_failure_marks_job_and_never_publishes_partial_index(
 ) -> None:
     client, runtime = r3_client
     headers = {"x-tenant-id": TENANT, "x-actor-id": ACTOR, "x-roles": "owner"}
-    kb = client.post("/v1/knowledge-bases", headers=headers, json={"name": "Failure"}).json()[
-        "id"
-    ]
+    kb = client.post("/v1/knowledge-bases", headers=headers, json={"name": "Failure"}).json()["id"]
     stream = BytesIO()
     with ZipFile(stream, "w", ZIP_DEFLATED) as archive:
         archive.writestr("word/document.xml", "A" * 2_000_000)

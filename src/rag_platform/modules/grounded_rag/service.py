@@ -19,6 +19,7 @@ from rag_platform.modules.model_runtime.contracts import (
     ChatRequest,
     ModelRuntime,
 )
+from rag_platform.modules.retrieval.contracts import FilterExpression, RetrievalRequest
 from rag_platform.modules.retrieval.service import AuthorizedRetrieval
 
 FIXED_RAG_PROMPT_VERSION = "fixed-rag-v1"
@@ -70,14 +71,26 @@ class GroundedRag:
         knowledge_base_ids: tuple[KnowledgeBaseId, ...],
         top_k: int = 20,
         top_n: int = 5,
+        history: tuple[str, ...] = (),
+        target_languages: tuple[str, ...] = (),
+        user_filter: FilterExpression | None = None,
+        request_id: str | None = None,
     ) -> FixedRagAnswer:
         if not 1 <= top_n <= min(top_k, 50):
             raise ValueError("top_n must be within top_k")
         retrieval = self._retrieval.retrieve(
             context,
-            query=question,
-            knowledge_base_ids=knowledge_base_ids,
-            top_k=top_k,
+            request=RetrievalRequest(
+                question,
+                knowledge_base_ids,
+                top_k,
+                top_n,
+                history,
+                target_languages,
+                user_filter,
+                None,
+                request_id,
+            ),
         )
         if not retrieval.hits:
             return FixedRagAnswer(
@@ -89,7 +102,7 @@ class GroundedRag:
             )
         selected: list[tuple[SearchHit, str]] = []
         consumed = 0
-        for hit in retrieval.hits[:top_n]:
+        for hit in retrieval.hits:
             marker = f"[{len(selected) + 1}] {hit.content}\n"
             if selected and consumed + len(marker) > self._max_context_characters:
                 break

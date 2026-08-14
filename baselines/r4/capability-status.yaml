@@ -1,0 +1,29 @@
+schema_version: 1
+stage: R4
+reference_commit: ce74c58e664275ff239bcbb8c841771bc4649557
+status_vocabulary:
+  - implemented
+  - retrieval_fallback_implemented
+  - not_implemented_in_new_repo
+capabilities:
+  CAP-09: implemented
+  CAP-10: implemented
+  CAP-11: implemented
+  CAP-12: implemented
+  CAP-13: implemented
+  CAP-14: implemented
+  CAP-15: implemented
+  CAP-16: implemented
+  CAP-17: retrieval_fallback_implemented
+  CAP-18: implemented
+  CAP-19: implemented
+  CAP-20: implemented
+  CAP-22: implemented
+remaining_capabilities: not_implemented_in_new_repo
+limitations:
+  CAP-12: Query transformation uses the configured ModelRuntime; malformed or failed output retains canonical query.
+  CAP-13: Cross-language variants require a configured model with structured output; canonical retrieval remains available on failure.
+  CAP-16: PostgreSQL is the final authority; lifecycle tombstones and reliable projection coordination are completed in R6.
+  CAP-17: Retrieval fallback is complete; answer-level evidence classification and refusal policy remain R5.
+  CAP-19: Reranker failure degrades to deterministic RRF instead of failing the retrieval request.
+  CAP-22: Trace is content-free, role-scoped and TTL-tagged; R9 adds production observability and scheduled expiry enforcement.

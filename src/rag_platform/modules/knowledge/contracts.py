@@ -184,9 +184,7 @@ class OcrResult:
 
 
 class OcrEngine(Protocol):
-    def recognize(
-        self, image: object, *, language: str, timeout_seconds: float
-    ) -> OcrResult: ...
+    def recognize(self, image: object, *, language: str, timeout_seconds: float) -> OcrResult: ...
 
     def available_languages(self) -> frozenset[str]: ...
 
@@ -312,6 +310,14 @@ class SearchHit:
     source: Mapping[str, str]
     score: float
     rank: int
+    full_text_score: float | None = None
+    vector_score: float | None = None
+    fusion_score: float | None = None
+    rerank_score: float | None = None
+    full_text_rank: int | None = None
+    vector_rank: int | None = None
+    rerank_rank: int | None = None
+    index_version_id: IndexVersionId | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -325,6 +331,18 @@ class RetrievalTraceRecord:
     selected_chunk_ids: tuple[ChunkId, ...]
     authorization_applied: bool
     created_at: datetime
+    canonical_query_sha256: str = ""
+    query_variant_sha256: tuple[str, ...] = ()
+    events: tuple[Mapping[str, object], ...] = ()
+    candidate_traces: tuple[Mapping[str, object], ...] = ()
+    fallback_steps: tuple[Mapping[str, object], ...] = ()
+    filter_summary: tuple[str, ...] = ()
+    provider_ids: tuple[str, ...] = ()
+    completed_at: datetime | None = None
+    expires_at: datetime | None = None
+    error_code: str | None = None
+    request_id: str | None = None
+    index_version_ids: tuple[IndexVersionId, ...] = ()
 
 
 class KnowledgeRepository(Protocol):
@@ -382,6 +400,13 @@ class KnowledgeRepository(Protocol):
         knowledge_base_ids: tuple[KnowledgeBaseId, ...],
         query_vector: tuple[float, ...],
         top_k: int,
+    ) -> tuple[SearchHit, ...]: ...
+
+    def validate_search_hits(
+        self,
+        context: AuthorizationContext,
+        knowledge_base_ids: tuple[KnowledgeBaseId, ...],
+        hits: tuple[SearchHit, ...],
     ) -> tuple[SearchHit, ...]: ...
 
     def save_trace(self, value: RetrievalTraceRecord) -> None: ...

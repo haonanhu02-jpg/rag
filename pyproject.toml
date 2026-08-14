@@ -12,6 +12,7 @@ dependencies = [
     "alembic>=1.18,<2",
     "beautifulsoup4>=4.13,<5",
     "charset-normalizer>=3.4,<4",
+    "elasticsearch>=9.1,<10",
     "fastapi>=0.128,<1",
     "langchain-core>=1.2,<2",
     "langgraph>=1.0,<2",

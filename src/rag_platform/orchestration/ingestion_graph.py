@@ -21,6 +21,7 @@ from rag_platform.modules.knowledge.contracts import (
 )
 from rag_platform.modules.model_runtime.contracts import EmbeddingRequest, ModelRuntime
 from rag_platform.modules.ports import Clock, ObjectStore
+from rag_platform.modules.retrieval.contracts import SearchProjection
 
 
 class IngestionState(TypedDict, total=False):
@@ -42,6 +43,7 @@ class IngestionGraph:
         models: ModelRuntime,
         embedding_model_id: str,
         clock: Clock,
+        search_projection: SearchProjection | None = None,
     ) -> None:
         self._repository = repository
         self._object_store = object_store
@@ -49,18 +51,21 @@ class IngestionGraph:
         self._models = models
         self._embedding_model_id = embedding_model_id
         self._clock = clock
+        self._search_projection = search_projection
         builder = StateGraph(IngestionState)
         builder.add_node("load", self._load)
         builder.add_node("compile", self._compile)
         builder.add_node("embed", self._embed)
         builder.add_node("stage", self._stage)
+        builder.add_node("project", self._project)
         builder.add_node("validate", self._validate)
         builder.add_node("publish", self._publish)
         builder.add_edge(START, "load")
         builder.add_conditional_edges("load", self._after_load)
         builder.add_edge("compile", "embed")
         builder.add_edge("embed", "stage")
-        builder.add_edge("stage", "validate")
+        builder.add_edge("stage", "project")
+        builder.add_edge("project", "validate")
         builder.add_edge("validate", "publish")
         builder.add_edge("publish", END)
         self._graph = builder.compile()
@@ -135,6 +140,17 @@ class IngestionGraph:
 
     def _validate(self, state: IngestionState) -> IngestionState:
         self._repository.validate_generation(state["generation"])
+        return {}
+
+    def _project(self, state: IngestionState) -> IngestionState:
+        if self._search_projection is not None:
+            self._search_projection.project_document(
+                state["source"],
+                state["document"],
+                state["vectors"],
+                state["generation"],
+                self._now(),
+            )
         return {}
 
     def _publish(self, state: IngestionState) -> IngestionState:

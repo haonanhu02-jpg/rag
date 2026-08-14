@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 
 from rag_platform.modules.model_runtime.contracts import (
     ChatRequest,
@@ -26,9 +27,11 @@ class FakeModelRuntime:
         registrations: tuple[ModelRegistration, ...],
         *,
         chat_response: str | None = None,
+        structured_response: Mapping[str, JsonValue] | None = None,
     ) -> None:
         self._registrations = {registration.id: registration for registration in registrations}
         self._chat_response = chat_response
+        self._structured_response = structured_response
         self.chat_requests: list[ChatRequest] = []
         self.embedding_requests: list[EmbeddingRequest] = []
 
@@ -44,7 +47,7 @@ class FakeModelRuntime:
         text = self._chat_response or request.messages[-1].content
         structured: dict[str, JsonValue] | None = None
         if request.structured_schema is not None:
-            structured = {"text": text}
+            structured = dict(self._structured_response or {"text": text})
         tokens = sum(len(message.content.split()) for message in request.messages)
         return ChatResult(
             request.model_id,

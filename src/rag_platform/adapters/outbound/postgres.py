@@ -25,6 +25,7 @@ from sqlalchemy import (
     delete,
     func,
     insert,
+    or_,
     select,
     update,
 )
@@ -212,6 +213,18 @@ retrieval_traces = Table(
     Column("selected_chunk_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False),
     Column("authorization_applied", Boolean, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("canonical_query_sha256", String(64), nullable=False, server_default=""),
+    Column("query_variant_sha256", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("events", JSONB, nullable=False, server_default="[]"),
+    Column("candidate_traces", JSONB, nullable=False, server_default="[]"),
+    Column("fallback_steps", JSONB, nullable=False, server_default="[]"),
+    Column("filter_summary", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("provider_ids", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("completed_at", DateTime(timezone=True), nullable=True),
+    Column("expires_at", DateTime(timezone=True), nullable=True),
+    Column("error_code", String(100), nullable=True),
+    Column("request_id", String(200), nullable=True),
+    Column("index_version_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False, server_default="{}"),
 )
 
 
@@ -328,7 +341,15 @@ class PostgresKnowledgeRepository:
         )
         with self._engine.connect() as connection:
             row = connection.execute(statement).mappings().one_or_none()
-        return None if row is None else self._knowledge_base(row)
+        if row is None:
+            return None
+        if (
+            row["visibility"] == "private"
+            and row["owner_id"] != context.actor_id.value
+            and "admin" not in context.roles
+        ):
+            return None
+        return self._knowledge_base(row)
 
     def register_upload(
         self,
@@ -887,18 +908,35 @@ class PostgresKnowledgeRepository:
                     selected_chunk_ids=[item.value for item in value.selected_chunk_ids],
                     authorization_applied=value.authorization_applied,
                     created_at=value.created_at,
+                    canonical_query_sha256=value.canonical_query_sha256,
+                    query_variant_sha256=list(value.query_variant_sha256),
+                    events=list(value.events),
+                    candidate_traces=list(value.candidate_traces),
+                    fallback_steps=list(value.fallback_steps),
+                    filter_summary=list(value.filter_summary),
+                    provider_ids=list(value.provider_ids),
+                    completed_at=value.completed_at,
+                    expires_at=value.expires_at,
+                    error_code=value.error_code,
+                    request_id=value.request_id,
+                    index_version_ids=[item.value for item in value.index_version_ids],
                 )
             )
 
     def get_trace(
         self, context: AuthorizationContext, trace_id: TraceId
     ) -> RetrievalTraceRecord | None:
+        CorePolicies.require_role(context, "owner", "admin", "auditor")
         with self._engine.connect() as connection:
             row = (
                 connection.execute(
                     select(retrieval_traces).where(
                         retrieval_traces.c.id == trace_id.value,
                         retrieval_traces.c.tenant_id == context.tenant_id.value,
+                        or_(
+                            retrieval_traces.c.expires_at.is_(None),
+                            retrieval_traces.c.expires_at > func.now(),
+                        ),
                     )
                 )
                 .mappings()
@@ -916,7 +954,69 @@ class PostgresKnowledgeRepository:
             tuple(ChunkId(value) for value in row["selected_chunk_ids"]),
             bool(row["authorization_applied"]),
             cast(datetime, row["created_at"]),
+            str(row["canonical_query_sha256"]),
+            tuple(str(value) for value in row["query_variant_sha256"]),
+            tuple(cast(dict[str, object], value) for value in row["events"]),
+            tuple(cast(dict[str, object], value) for value in row["candidate_traces"]),
+            tuple(cast(dict[str, object], value) for value in row["fallback_steps"]),
+            tuple(str(value) for value in row["filter_summary"]),
+            tuple(str(value) for value in row["provider_ids"]),
+            cast(datetime | None, row["completed_at"]),
+            cast(datetime | None, row["expires_at"]),
+            cast(str | None, row["error_code"]),
+            cast(str | None, row["request_id"]),
+            tuple(IndexVersionId(value) for value in row["index_version_ids"]),
         )
+
+    def validate_search_hits(
+        self,
+        context: AuthorizationContext,
+        knowledge_base_ids: tuple[KnowledgeBaseId, ...],
+        hits: tuple[SearchHit, ...],
+    ) -> tuple[SearchHit, ...]:
+        """Revalidate projection candidates against current PostgreSQL authority."""
+
+        if not hits:
+            return ()
+        for knowledge_base_id in knowledge_base_ids:
+            CorePolicies.require_knowledge_base(context, knowledge_base_id)
+        allowed_ids = [value.value for value in knowledge_base_ids]
+        visibility = [
+            knowledge_bases.c.visibility == "tenant",
+            knowledge_bases.c.owner_id == context.actor_id.value,
+        ]
+        if "admin" in context.roles:
+            visibility.append(knowledge_bases.c.status == "active")
+        statement = (
+            select(document_chunks.c.id)
+            .join(
+                document_versions,
+                document_versions.c.id == document_chunks.c.document_version_id,
+            )
+            .join(
+                knowledge_bases,
+                knowledge_bases.c.id == document_chunks.c.knowledge_base_id,
+            )
+            .join(chunk_embeddings, chunk_embeddings.c.chunk_id == document_chunks.c.id)
+            .join(index_versions, index_versions.c.id == chunk_embeddings.c.index_version_id)
+            .where(
+                document_chunks.c.id.in_([value.chunk_id.value for value in hits]),
+                document_chunks.c.tenant_id == context.tenant_id.value,
+                document_chunks.c.knowledge_base_id.in_(allowed_ids),
+                document_versions.c.tenant_id == context.tenant_id.value,
+                document_versions.c.status == "active",
+                knowledge_bases.c.tenant_id == context.tenant_id.value,
+                knowledge_bases.c.status == "active",
+                or_(*visibility),
+                index_versions.c.tenant_id == context.tenant_id.value,
+                index_versions.c.knowledge_base_id.in_(allowed_ids),
+                index_versions.c.status == "active",
+            )
+            .distinct()
+        )
+        with self._engine.connect() as connection:
+            authorized = set(connection.scalars(statement))
+        return tuple(hit for hit in hits if hit.chunk_id.value in authorized)
 
     def document_version_status(
         self, document_version_id: DocumentVersionId
