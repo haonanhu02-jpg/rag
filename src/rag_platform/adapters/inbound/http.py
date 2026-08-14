@@ -1,4 +1,4 @@
-"""FastAPI translation layer for the R2 public contract."""
+"""FastAPI translation layer for the current public contract."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rag_platform.bootstrap.r2_runtime import R2Runtime
 from rag_platform.domain.authorization import AuthorizationContext, TrustedPrincipal
@@ -30,6 +30,11 @@ from rag_platform.domain.identifiers import (
 )
 from rag_platform.domain.policies import AccessDenied, ResourceNotFound
 from rag_platform.modules.knowledge.contracts import IdempotencyConflict, UnsupportedDocument
+from rag_platform.modules.retrieval.contracts import (
+    SearchDependencyError,
+    combine_filters,
+    parse_filter_expression,
+)
 
 
 class ApiModel(BaseModel):
@@ -47,10 +52,20 @@ class FixedRagBody(ApiModel):
     knowledge_base_ids: list[UUID] = Field(min_length=1)
     top_k: int = Field(default=20, ge=1, le=1000)
     top_n: int = Field(default=5, ge=1, le=50)
-    history: list[str] = Field(default_factory=list, max_length=16)
-    target_languages: list[str] = Field(default_factory=list, max_length=4)
-    filters: list[dict[str, object]] = Field(default_factory=list)
+    history: list[Annotated[str, Field(min_length=1, max_length=8000)]] = Field(
+        default_factory=list, max_length=16
+    )
+    target_languages: list[Annotated[str, Field(min_length=1, max_length=32)]] = Field(
+        default_factory=list, max_length=4
+    )
+    filters: list[dict[str, object]] = Field(default_factory=list, max_length=64)
     filter_expression: dict[str, object] | None = None
+
+    @model_validator(mode="after")
+    def top_n_is_within_top_k(self) -> FixedRagBody:
+        if self.top_n > self.top_k:
+            raise ValueError("top_n cannot exceed top_k")
+        return self
 
 
 def _context(
@@ -161,20 +176,25 @@ def build_router(runtime: R2Runtime) -> APIRouter:
     def fixed_rag(
         body: FixedRagBody,
         context: Annotated[AuthorizationContext, Depends(_context)],
+        x_request_id: Annotated[str | None, Header()] = None,
     ) -> dict[str, object]:
-        if body.filters or body.filter_expression is not None:
-            raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "metadata filters require R4")
-        if body.history or body.target_languages:
-            raise HTTPException(
-                status.HTTP_501_NOT_IMPLEMENTED,
-                "history and cross-language retrieval require a later stage",
-            )
+        try:
+            expressions = tuple(parse_filter_expression(item) for item in body.filters)
+            if body.filter_expression is not None:
+                expressions += (parse_filter_expression(body.filter_expression),)
+            user_filter = combine_filters(expressions)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
         answer = runtime.grounded_rag.answer(
             context,
             question=body.question,
             knowledge_base_ids=tuple(KnowledgeBaseId(value) for value in body.knowledge_base_ids),
             top_k=body.top_k,
             top_n=body.top_n,
+            history=tuple(body.history),
+            target_languages=tuple(body.target_languages),
+            user_filter=user_filter,
+            request_id=x_request_id,
         )
         return {
             "status": answer.status,
@@ -217,6 +237,18 @@ def build_router(runtime: R2Runtime) -> APIRouter:
             "selected_chunk_ids": [str(item) for item in value.selected_chunk_ids],
             "authorization_applied": value.authorization_applied,
             "created_at": value.created_at,
+            "canonical_query_sha256": value.canonical_query_sha256,
+            "query_variant_sha256": list(value.query_variant_sha256),
+            "events": list(value.events),
+            "candidates": list(value.candidate_traces),
+            "fallback_steps": list(value.fallback_steps),
+            "filter_summary": list(value.filter_summary),
+            "provider_ids": list(value.provider_ids),
+            "completed_at": value.completed_at,
+            "expires_at": value.expires_at,
+            "error_code": value.error_code,
+            "request_id": value.request_id,
+            "index_version_ids": [str(item) for item in value.index_version_ids],
         }
 
     return router
@@ -244,3 +276,4 @@ def install_error_handlers(app: object) -> None:
     active.add_exception_handler(AccessDenied, handler("forbidden", 403))
     active.add_exception_handler(IdempotencyConflict, handler("idempotency_conflict", 409))
     active.add_exception_handler(UnsupportedDocument, handler("unsupported_document", 415))
+    active.add_exception_handler(SearchDependencyError, handler("search_dependency_failed", 503))

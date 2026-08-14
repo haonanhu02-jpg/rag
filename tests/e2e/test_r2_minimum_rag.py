@@ -32,7 +32,15 @@ def r2_client(tmp_path: Path) -> Iterator[tuple[TestClient, R2Runtime]]:
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
     command.downgrade(config, "base")
     command.upgrade(config, "head")
-    settings = Settings("test", database_url, "INFO", str(tmp_path / "objects"), 4096)
+    settings = Settings(
+        "test",
+        database_url,
+        "INFO",
+        str(tmp_path / "objects"),
+        4096,
+        os.environ.get("RAG_TEST_ELASTICSEARCH_URL", "http://localhost:9200"),
+        f"rag-r2-test-{tmp_path.name}".lower(),
+    )
     runtime = R2Runtime(settings)
     with TestClient(create_app(settings, runtime)) as client:
         yield client, runtime
@@ -120,6 +128,19 @@ def test_upload_ingest_query_citation_trace_and_idempotency(
     trace = client.get(f"/v1/retrieval-traces/{body['trace_id']}", headers=headers)
     assert trace.json()["authorization_applied"] is True
     assert trace.json()["candidate_count"] >= 1
+    assert {event["stage"] for event in trace.json()["events"]} >= {
+        "full_text",
+        "vector",
+        "fusion",
+        "rerank",
+        "select",
+    }
+    candidate = trace.json()["candidates"][0]
+    assert candidate["full_text_rank"] is not None
+    assert candidate["vector_rank"] is not None
+    assert candidate["fusion_rank"] is not None
+    assert candidate["rerank_rank"] is not None
+    assert "quote" not in candidate and "content" not in candidate
 
     with runtime.engine.connect() as connection:
         counts = (
@@ -224,4 +245,59 @@ def test_upload_contract_rejects_missing_identity_media_and_idempotency_conflict
             "filters": [{"field": "document_id", "operator": "equals", "value": "x"}],
         },
     )
-    assert unsupported_filter.status_code == 501
+    assert unsupported_filter.status_code == 200
+    assert unsupported_filter.json()["status"] == "no_evidence"
+
+
+def test_r4_filters_history_and_cross_language_are_supported(
+    r2_client: tuple[TestClient, R2Runtime],
+) -> None:
+    client, runtime = r2_client
+    headers = _headers(TENANT_A, ACTOR_A)
+    kb = client.post(
+        "/v1/knowledge-bases", headers=headers, json={"name": "R4", "visibility": "tenant"}
+    ).json()["id"]
+    upload = client.post(
+        f"/v1/knowledge-bases/{kb}/documents",
+        headers={**headers, "Idempotency-Key": "r4-query"},
+        files={"file": ("relay.txt", b"quasar relay recovery procedure", "text/plain")},
+    ).json()
+    runtime.ingestion.run(JobId(UUID(upload["job_id"])))
+
+    response = client.post(
+        "/v1/rag/query",
+        headers={**headers, "x-request-id": "request-r4-001"},
+        json={
+            "question": "How?",
+            "knowledge_base_ids": [kb],
+            "history": ["How do I recover the quasar relay?"],
+            "target_languages": ["zh"],
+            "filter_expression": {
+                "operator": "and",
+                "items": [
+                    {"field": "media_type", "operator": "equals", "value": "text/plain"},
+                    {
+                        "field": "document_id",
+                        "operator": "equals",
+                        "value": upload["document_id"],
+                    },
+                ],
+            },
+            "top_n": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "answered"
+    trace = client.get(
+        f"/v1/retrieval-traces/{response.json()['trace_id']}", headers=headers
+    ).json()
+    assert trace["query_variant_sha256"]
+    assert trace["filter_summary"][-2] == "user_ast:present"
+    assert trace["request_id"] == "request-r4-001"
+    assert trace["index_version_ids"]
+    denied = client.get(
+        f"/v1/retrieval-traces/{response.json()['trace_id']}",
+        headers={**headers, "x-roles": "editor"},
+    )
+    assert denied.status_code == 403

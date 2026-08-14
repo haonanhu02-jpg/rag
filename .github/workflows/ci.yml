@@ -14,6 +14,7 @@ jobs:
     env:
       RAG_LEGACY_REFERENCE_ROOT: .r0-reference
       RAG_TEST_DATABASE_URL: postgresql+psycopg://rag:rag@localhost:5432/rag_test
+      RAG_TEST_ELASTICSEARCH_URL: http://localhost:9200
     services:
       postgres:
         image: pgvector/pgvector:0.8.6-pg17
@@ -28,6 +29,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.1.2
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fs http://localhost:9200/_cluster/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - uses: actions/checkout@v5
       - name: Checkout pinned legacy reference
@@ -61,6 +75,8 @@ jobs:
         run: uv run python scripts/check_r2_vertical_slice.py
       - name: R3 document compiler gate
         run: uv run python scripts/check_r3_document_compiler.py
+      - name: R4 authorized retrieval gate
+        run: uv run python scripts/check_r4_authorized_retrieval.py
       - name: Tests
         run: uv run pytest -q --cov --cov-report=term-missing
       - name: Dependency audit
