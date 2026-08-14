@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import concurrent.futures
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import TypeVar, cast
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 
 from rag_platform.modules.model_runtime.contracts import (
     ChatRequest,
     ChatResult,
+    ChatStreamChunk,
     EmbeddingRequest,
     EmbeddingResult,
     InvalidModelOutput,
@@ -142,6 +143,49 @@ class LangChainModelRuntime:
             duration_ms,
         )
 
+    def stream_chat(self, request: ChatRequest) -> Iterator[ChatStreamChunk]:
+        registration = self._registration(request.model_id, ModelKind.CHAT)
+        model = self._chat_models.get(request.model_id)
+        if model is None:
+            raise UnknownModel(f"chat adapter missing for {request.model_id}")
+        if request.structured_schema is not None:
+            raise InvalidModelOutput("structured model output cannot be streamed")
+        messages = self._messages(request)
+        started = time.perf_counter()
+        iterator = iter(
+            model.stream(
+                messages,
+                config={"metadata": dict(request.metadata), "run_name": request.model_id},
+            )
+        )
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            while True:
+                remaining = request.policy.timeout_seconds - (time.perf_counter() - started)
+                if remaining <= 0:
+                    raise ModelTimeout("streaming model invocation timed out")
+                future = executor.submit(_next_stream_value, iterator)
+                try:
+                    done, raw = future.result(timeout=remaining)
+                except concurrent.futures.TimeoutError as exc:
+                    future.cancel()
+                    raise ModelTimeout("streaming model invocation timed out") from exc
+                except Exception as exc:
+                    raise ModelRuntimeError("streaming model invocation failed") from exc
+                if done:
+                    return
+                if not isinstance(raw, (AIMessage, AIMessageChunk)):
+                    raise InvalidModelOutput("streaming chat output must be an AI message")
+                reason = raw.response_metadata.get("finish_reason")
+                yield ChatStreamChunk(
+                    request.model_id,
+                    raw.text,
+                    self._usage(raw, registration),
+                    str(reason) if reason is not None else None,
+                )
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
     def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
         self._registration(request.model_id, ModelKind.EMBEDDING)
         model = self._embedding_models.get(request.model_id)
@@ -196,3 +240,10 @@ class LangChainModelRuntime:
             attempts,
             duration_ms,
         )
+
+
+def _next_stream_value(iterator: Iterator[object]) -> tuple[bool, object | None]:
+    try:
+        return False, next(iterator)
+    except StopIteration:
+        return True, None

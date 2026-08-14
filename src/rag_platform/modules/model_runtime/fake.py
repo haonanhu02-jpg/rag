@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+import re
+from collections.abc import Iterator, Mapping
 
 from rag_platform.modules.model_runtime.contracts import (
     ChatRequest,
     ChatResult,
+    ChatStreamChunk,
     EmbeddingRequest,
     EmbeddingResult,
+    InvalidModelOutput,
     JsonValue,
     ModelKind,
     ModelRegistration,
@@ -57,6 +60,15 @@ class FakeModelRuntime:
             attempts=1,
             duration_ms=0,
         )
+
+    def stream_chat(self, request: ChatRequest) -> Iterator[ChatStreamChunk]:
+        result = self.chat(request)
+        if result.structured is not None:
+            raise InvalidModelOutput("structured fake responses cannot be streamed")
+        parts = re.findall(r"\S+\s*", result.text)
+        for part in parts:
+            yield ChatStreamChunk(result.model_id, part)
+        yield ChatStreamChunk(result.model_id, "", result.usage, "stop")
 
     def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
         self._require(request.model_id, ModelKind.EMBEDDING)

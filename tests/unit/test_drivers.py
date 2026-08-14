@@ -12,6 +12,8 @@ from rag_platform.compatibility import (
     NotImplementedNewDriver,
     R2MinimumNewDriver,
     R3NewDriver,
+    R4NewDriver,
+    R5NewDriver,
     SubprocessDriver,
 )
 from rag_platform.compatibility.drivers import DriverProtocolError
@@ -67,6 +69,17 @@ def test_r3_driver_truthfully_reports_full_and_foundation_statuses() -> None:
     assert isinstance(multimodal.output, dict)
     assert multimodal.output["implementation_status"] == "parsing_foundation_implemented"
     assert remaining.status is DriverStatus.NOT_IMPLEMENTED
+
+
+def test_r4_and_r5_drivers_overlay_only_evidenced_capabilities() -> None:
+    r4 = R4NewDriver().invoke(DriverRequest("CAP-19", "CAP-19-BASELINE"))
+    r5 = R5NewDriver().invoke(DriverRequest("CAP-27", "CAP-27-BASELINE"))
+    future = R5NewDriver().invoke(DriverRequest("CAP-28", "CAP-28-BASELINE"))
+    assert isinstance(r4.output, dict)
+    assert r4.output["stage"] == "R4"
+    assert isinstance(r5.output, dict)
+    assert r5.output["implementation_status"] == "implemented"
+    assert future.status is DriverStatus.NOT_IMPLEMENTED
 
 
 def test_subprocess_driver_reports_timeout(tmp_path: Path) -> None:

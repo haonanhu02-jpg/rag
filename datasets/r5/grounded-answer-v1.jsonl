@@ -1,0 +1,4 @@
+{"case_id":"sufficient-1","expected_status":"sufficient","expected_refusal":false,"expected_citations":["chunk-a"]}
+{"case_id":"partial-1","expected_status":"partial_evidence","expected_refusal":false,"expected_citations":["chunk-a"]}
+{"case_id":"empty-1","expected_status":"no_evidence","expected_refusal":true,"expected_citations":[]}
+{"case_id":"conflict-1","expected_status":"conflicting_evidence","expected_refusal":true,"expected_citations":["chunk-a","chunk-b"]}

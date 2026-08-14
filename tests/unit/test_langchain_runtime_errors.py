@@ -13,6 +13,7 @@ from rag_platform.modules.model_runtime import (
     ChatMessage,
     ChatRequest,
     EmbeddingRequest,
+    InvocationPolicy,
     ModelKind,
     ModelRegistration,
     RerankRequest,
@@ -111,3 +112,32 @@ def test_invoke_times_out() -> None:
 
     with pytest.raises(ModelTimeout):
         LangChainModelRuntime._invoke(slow, timeout_seconds=0.001, max_retries=0)
+
+
+def test_stream_contract_rejects_structured_missing_and_timed_out_models() -> None:
+    model = FakeMessagesListChatModel(responses=[AIMessage("slow")], sleep=0.05)
+    runtime = LangChainModelRuntime(REGISTRATIONS, chat_models={"chat": model})
+    with pytest.raises(InvalidModelOutput, match="structured"):
+        tuple(
+            runtime.stream_chat(
+                ChatRequest(
+                    "chat",
+                    (ChatMessage("user", "q"),),
+                    structured_schema={"type": "object"},
+                )
+            )
+        )
+    with pytest.raises(UnknownModel, match="adapter"):
+        tuple(LangChainModelRuntime(REGISTRATIONS).stream_chat(
+            ChatRequest("chat", (ChatMessage("user", "q"),))
+        ))
+    with pytest.raises(ModelTimeout, match="streaming"):
+        tuple(
+            runtime.stream_chat(
+                ChatRequest(
+                    "chat",
+                    (ChatMessage("user", "q"),),
+                    policy=InvocationPolicy(timeout_seconds=0.001, max_retries=0),
+                )
+            )
+        )

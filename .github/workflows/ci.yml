@@ -77,6 +77,8 @@ jobs:
         run: uv run python scripts/check_r3_document_compiler.py
       - name: R4 authorized retrieval gate
         run: uv run python scripts/check_r4_authorized_retrieval.py
+      - name: R5 grounded RAG gate
+        run: uv run python scripts/check_r5_grounded_rag.py
       - name: Tests
         run: uv run pytest -q --cov --cov-report=term-missing
       - name: Dependency audit

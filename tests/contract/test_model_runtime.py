@@ -40,6 +40,9 @@ def assert_model_runtime_contract(runtime: ModelRuntime) -> None:
     assert chat.model_id == "chat"
     assert chat.text
     assert chat.attempts == 1
+    streamed = tuple(runtime.stream_chat(ChatRequest("chat", (ChatMessage("user", "stream"),))))
+    assert "".join(item.delta for item in streamed)
+    assert streamed[-1].finish_reason == "stop" or streamed[-1].delta
 
     embedding = runtime.embed(EmbeddingRequest("embedding", ("alpha", "beta")))
     assert len(embedding.vectors) == 2

@@ -1,0 +1,18 @@
+schema_version: 1
+stage: R5
+reference_commit: ce74c58e664275ff239bcbb8c841771bc4649557
+status_vocabulary:
+  - implemented
+  - fixed_rag_model_governance_implemented
+  - fixed_rag_api_implemented
+  - not_implemented_in_new_repo
+capabilities:
+  CAP-17: implemented
+  CAP-21: implemented
+  CAP-27: implemented
+  CAP-36: fixed_rag_model_governance_implemented
+  CAP-37: fixed_rag_api_implemented
+remaining_capabilities: not_implemented_in_new_repo
+limitations:
+  CAP-36: Real-provider quality evaluation is not claimed without configured provider credentials; R7 extends model governance to Agent execution and R9 adds production accounting.
+  CAP-37: Fixed RAG JSON and SSE interfaces are complete; lifecycle, Agent and advanced-knowledge APIs arrive in their owning stages.
