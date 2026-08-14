@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "report_id": "rag-greenfield-r6-reliable-lifecycle",
+  "stage": "R6",
+  "status": "completed",
+  "generated_at": "2026-08-14",
+  "source": {
+    "commit": "PENDING_R6_IMPLEMENTATION_COMMIT"
+  },
+  "scope": {
+    "capabilities": [
+      "CAP-23",
+      "CAP-24",
+      "CAP-25",
+      "CAP-26",
+      "CAP-38"
+    ],
+    "migration_head": "20260814_0006",
+    "langgraph_ingestion_orchestration": true,
+    "postgresql_business_authority": true,
+    "maintainer_default": "dry_run"
+  },
+  "evidence": {
+    "transactional_outbox_and_deterministic_message_id": true,
+    "tenant_envelope_and_idempotent_commands": true,
+    "ingestion_job_and_seven_tasks": true,
+    "lease_recovery_duplicate_delivery_and_finite_retry": true,
+    "transient_permanent_cancelled_dead_letter_states": true,
+    "immutable_versions_reparse_update_and_failure_preserves_active": true,
+    "candidate_validation_fencing_and_cas_route_activation": true,
+    "rollback_builds_and_projects_new_generation": true,
+    "immediate_tombstone_restore_and_retained_purge": true,
+    "kb_rebuild_atomic_route_switch_and_old_generation_retention": true,
+    "dry_run_reconciliation_and_safe_repairs": true,
+    "cross_store_orphan_inventory_and_repair": true,
+    "real_postgresql_elasticsearch_object_store_e2e": true,
+    "source_reuse": "none"
+  },
+  "next_stage": "R7"
+}

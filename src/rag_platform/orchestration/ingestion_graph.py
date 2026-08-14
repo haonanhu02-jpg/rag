@@ -70,7 +70,7 @@ class IngestionGraph:
         builder.add_edge("publish", END)
         self._graph = builder.compile()
 
-    def run(self, job_id: JobId) -> IngestionJobRecord:
+    def run(self, job_id: JobId, *, record_failure: bool = True) -> IngestionJobRecord:
         try:
             state = cast(IngestionState, self._graph.invoke({"job_id": job_id}))
             return state["job"]
@@ -80,16 +80,19 @@ class IngestionGraph:
                 code = exc.code
             elif isinstance(exc, DocumentResourceLimit):
                 code = "parser_resource_limit"
-            self._repository.fail_ingestion(
-                job_id,
-                code=code,
-                message=str(exc)[:1000],
-                now=self._now(),
-            )
+            if record_failure:
+                self._repository.fail_ingestion(
+                    job_id,
+                    code=code,
+                    message=str(exc)[:1000],
+                    now=self._now(),
+                )
             raise
 
     def _load(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["job_id"], "load", 0.05)
         source = self._repository.begin_ingestion(state["job_id"], self._now())
+        self._finish_task(state["job_id"], "load", 0.1)
         if source.job.status is WorkStatus.SUCCEEDED:
             return {"source": source, "job": source.job}
         return {"source": source}
@@ -99,6 +102,7 @@ class IngestionGraph:
         return "__end__" if "job" in state else "compile"
 
     def _compile(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "compile", 0.15)
         source = state["source"]
         content = self._object_store.get(
             tenant_id=source.job.tenant_id,
@@ -115,10 +119,13 @@ class IngestionGraph:
             source_sha256=source.source_sha256,
             file_name=source.file_name,
             chunk_method=source.chunk_method,
+            document_version_id=source.job.document_version_id,
         )
+        self._finish_task(source.job.id, "compile", 0.3)
         return {"document": document}
 
     def _embed(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "embed", 0.35)
         document = state["document"]
         result = self._models.embed(
             EmbeddingRequest(
@@ -126,9 +133,11 @@ class IngestionGraph:
                 tuple(chunk.text for chunk in document.chunks),
             )
         )
+        self._finish_task(state["source"].job.id, "embed", 0.5)
         return {"vectors": result.vectors}
 
     def _stage(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "stage", 0.55)
         value = self._repository.stage_generation(
             state["source"],
             state["document"],
@@ -136,13 +145,17 @@ class IngestionGraph:
             self._embedding_model_id,
             self._now(),
         )
+        self._finish_task(state["source"].job.id, "stage", 0.7)
         return {"generation": value}
 
     def _validate(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "validate", 0.85)
         self._repository.validate_generation(state["generation"])
+        self._finish_task(state["source"].job.id, "validate", 0.9)
         return {}
 
     def _project(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "project", 0.75)
         if self._search_projection is not None:
             self._search_projection.project_document(
                 state["source"],
@@ -151,13 +164,34 @@ class IngestionGraph:
                 state["generation"],
                 self._now(),
             )
+        self._finish_task(state["source"].job.id, "project", 0.8)
         return {}
 
     def _publish(self, state: IngestionState) -> IngestionState:
+        self._start_task(state["source"].job.id, "publish", 0.95)
         job = self._repository.publish_generation(state["source"], state["generation"], self._now())
         if job.status is not WorkStatus.SUCCEEDED:
             raise RuntimeError("published ingestion did not succeed")
+        self._finish_task(state["source"].job.id, "publish", 1.0)
         return {"job": job}
+
+    def _start_task(self, job_id: JobId, task: str, progress: float) -> None:
+        self._repository.mark_ingestion_task(
+            job_id,
+            task,
+            status=WorkStatus.RUNNING,
+            progress=progress,
+            now=self._now(),
+        )
+
+    def _finish_task(self, job_id: JobId, task: str, progress: float) -> None:
+        self._repository.mark_ingestion_task(
+            job_id,
+            task,
+            status=WorkStatus.SUCCEEDED,
+            progress=progress,
+            now=self._now(),
+        )
 
     def _now(self) -> datetime:
         now = self._clock.now()

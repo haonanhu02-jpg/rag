@@ -24,6 +24,7 @@ from rag_platform.modules.knowledge.contracts import (
     SearchHit,
     StagedGeneration,
 )
+from rag_platform.modules.lifecycle.contracts import ProjectionVersionRecord
 from rag_platform.modules.retrieval.contracts import (
     FilterExpression,
     FilterGroupOperator,
@@ -143,6 +144,138 @@ class ElasticsearchSearchAdapter:
             helpers.bulk(self._client, actions, refresh="wait_for")
         except Exception as exc:
             raise SearchDependencyError("failed to write search projection") from exc
+
+    def set_document_deleted(
+        self, tenant_id: TenantId, document_id: DocumentId, *, deleted: bool
+    ) -> None:
+        self.ensure_index()
+        try:
+            self._client.update_by_query(
+                index=self._index,
+                query={
+                    "bool": {
+                        "filter": [
+                            {"term": {"tenant_id": str(tenant_id)}},
+                            {"term": {"document_id": str(document_id)}},
+                        ]
+                    }
+                },
+                script={
+                    "lang": "painless",
+                    "source": "ctx._source.document_deleted = params.deleted",
+                    "params": {"deleted": deleted},
+                },
+                refresh=True,
+                conflicts="proceed",
+            )
+        except Exception as exc:
+            raise SearchDependencyError("failed to update document tombstone") from exc
+
+    def purge_document(self, tenant_id: TenantId, document_id: DocumentId) -> None:
+        self.ensure_index()
+        try:
+            self._client.delete_by_query(
+                index=self._index,
+                query={
+                    "bool": {
+                        "filter": [
+                            {"term": {"tenant_id": str(tenant_id)}},
+                            {"term": {"document_id": str(document_id)}},
+                        ]
+                    }
+                },
+                refresh=True,
+                conflicts="proceed",
+            )
+        except Exception as exc:
+            raise SearchDependencyError("failed to purge document projection") from exc
+
+    def activate_document_version(
+        self,
+        tenant_id: TenantId,
+        document_id: DocumentId,
+        document_version_id: DocumentVersionId,
+        index_version_id: str,
+    ) -> None:
+        self.ensure_index()
+        try:
+            self._client.update_by_query(
+                index=self._index,
+                query={
+                    "bool": {
+                        "filter": [
+                            {"term": {"tenant_id": str(tenant_id)}},
+                            {"term": {"document_id": str(document_id)}},
+                        ]
+                    }
+                },
+                script={
+                    "lang": "painless",
+                    "source": (
+                        "ctx._source.document_enabled = "
+                        "ctx._source.document_version_id == params.version; "
+                        "if (ctx._source.document_enabled) { "
+                        "ctx._source.index_version_id = params.index; "
+                        "ctx._source.document_deleted = false; }"
+                    ),
+                    "params": {
+                        "version": str(document_version_id),
+                        "index": index_version_id,
+                    },
+                },
+                refresh=True,
+                conflicts="proceed",
+            )
+        except Exception as exc:
+            raise SearchDependencyError("failed to activate rollback projection") from exc
+
+    def list_projection_versions(self) -> tuple[ProjectionVersionRecord, ...]:
+        self.ensure_index()
+        counts: dict[tuple[TenantId, DocumentVersionId], int] = {}
+        try:
+            for hit in helpers.scan(
+                self._client,
+                index=self._index,
+                query={
+                    "query": {"match_all": {}},
+                    "_source": ["tenant_id", "document_version_id"],
+                },
+            ):
+                source = cast(Mapping[str, object], hit["_source"])
+                key = (
+                    TenantId(UUID(str(source["tenant_id"]))),
+                    DocumentVersionId(UUID(str(source["document_version_id"]))),
+                )
+                counts[key] = counts.get(key, 0) + 1
+        except Exception as exc:
+            raise SearchDependencyError("failed to inventory search projections") from exc
+        return tuple(
+            ProjectionVersionRecord(tenant_id, version_id, count)
+            for (tenant_id, version_id), count in sorted(
+                counts.items(), key=lambda item: (str(item[0][0]), str(item[0][1]))
+            )
+        )
+
+    def delete_document_version(
+        self, tenant_id: TenantId, document_version_id: DocumentVersionId
+    ) -> None:
+        self.ensure_index()
+        try:
+            self._client.delete_by_query(
+                index=self._index,
+                query={
+                    "bool": {
+                        "filter": [
+                            {"term": {"tenant_id": str(tenant_id)}},
+                            {"term": {"document_version_id": str(document_version_id)}},
+                        ]
+                    }
+                },
+                refresh=True,
+                conflicts="proceed",
+            )
+        except Exception as exc:
+            raise SearchDependencyError("failed to purge version projection") from exc
 
     def full_text(self, scope: SearchScope) -> tuple[SearchHit, ...]:
         self.ensure_index()

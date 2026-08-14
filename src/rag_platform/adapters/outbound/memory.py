@@ -60,6 +60,12 @@ class InMemoryObjectStore:
     def get(self, *, tenant_id: TenantId, key: str) -> bytes | None:
         return self._objects.get((tenant_id, key))
 
+    def delete(self, *, tenant_id: TenantId, key: str) -> None:
+        self._objects.pop((tenant_id, key), None)
+
+    def list_objects(self) -> tuple[tuple[TenantId, str], ...]:
+        return tuple(sorted(self._objects, key=lambda item: (str(item[0]), item[1])))
+
 
 class InMemoryMessageQueue:
     def __init__(self) -> None:

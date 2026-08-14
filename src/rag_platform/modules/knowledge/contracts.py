@@ -20,6 +20,7 @@ from rag_platform.domain.identifiers import (
     IndexVersionId,
     JobId,
     KnowledgeBaseId,
+    OperationId,
     TenantId,
     TraceId,
 )
@@ -78,6 +79,12 @@ class IngestionJobRecord:
     updated_at: datetime
     error_code: str | None = None
     error_message: str | None = None
+    operation_id: OperationId | None = None
+    attempts: int = 0
+    max_attempts: int = 6
+    next_attempt_at: datetime | None = None
+    cancellation_requested: bool = False
+    failure_class: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +304,7 @@ class StagedGeneration:
     generation: int
     chunk_count: int
     vector_dimensions: int
+    expected_fencing_token: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,6 +401,17 @@ class KnowledgeRepository(Protocol):
     ) -> IngestionJobRecord: ...
 
     def fail_ingestion(self, job_id: JobId, *, code: str, message: str, now: datetime) -> None: ...
+
+    def mark_ingestion_task(
+        self,
+        job_id: JobId,
+        task: str,
+        *,
+        status: WorkStatus,
+        progress: float,
+        now: datetime,
+        error: str | None = None,
+    ) -> None: ...
 
     def search(
         self,

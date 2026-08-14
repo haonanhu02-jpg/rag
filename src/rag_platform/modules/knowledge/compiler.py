@@ -153,6 +153,7 @@ class DocumentCompiler:
         source_sha256: str,
         file_name: str,
         chunk_method: str = "general",
+        document_version_id: DocumentVersionId | None = None,
     ) -> CompiledDocument:
         if not content:
             raise UnsupportedDocument("document is empty")
@@ -163,7 +164,7 @@ class DocumentCompiler:
         format_id = DocumentFormatRouter.resolve(
             file_name=file_name, media_type=media_type, content=content
         )
-        version_id = DocumentVersionId(
+        version_id = document_version_id or DocumentVersionId(
             uuid5(_VERSION_NAMESPACE, f"{document_id}:{source_sha256}")
         )
         request = ParserRequest(
@@ -237,6 +238,7 @@ class PlainTextDocumentCompiler:
         source_sha256: str,
         file_name: str,
         chunk_method: str = "general",
+        document_version_id: DocumentVersionId | None = None,
     ) -> CompiledDocument:
         try:
             content.decode("utf-8-sig")
@@ -251,6 +253,7 @@ class PlainTextDocumentCompiler:
             source_sha256=source_sha256,
             file_name=file_name,
             chunk_method=chunk_method,
+            document_version_id=document_version_id,
         )
 
 

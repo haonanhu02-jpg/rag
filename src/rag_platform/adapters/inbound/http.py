@@ -25,8 +25,12 @@ from rag_platform.bootstrap.r2_runtime import R2Runtime
 from rag_platform.domain.authorization import AuthorizationContext, TrustedPrincipal
 from rag_platform.domain.identifiers import (
     ActorId,
+    BatchId,
+    DocumentId,
+    DocumentVersionId,
     JobId,
     KnowledgeBaseId,
+    OperationId,
     TenantId,
     TraceId,
 )
@@ -41,6 +45,12 @@ from rag_platform.modules.grounded_rag import (
     RagStreamEvent,
 )
 from rag_platform.modules.knowledge.contracts import IdempotencyConflict, UnsupportedDocument
+from rag_platform.modules.lifecycle import (
+    LifecycleBatchRecord,
+    LifecycleKind,
+    LifecycleOperationRecord,
+)
+from rag_platform.modules.lifecycle.contracts import LifecycleCancelled, LifecycleConflict
 from rag_platform.modules.model_runtime.contracts import ModelRuntimeError, ModelTimeout
 from rag_platform.modules.retrieval.contracts import (
     FilterExpression,
@@ -79,6 +89,25 @@ class FixedRagBody(ApiModel):
         if self.top_n > self.top_k:
             raise ValueError("top_n cannot exceed top_k")
         return self
+
+
+class LifecycleReasonBody(ApiModel):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class ReparseBody(LifecycleReasonBody):
+    chunk_method: str | None = Field(default=None, min_length=1, max_length=32)
+
+
+class RollbackBody(LifecycleReasonBody):
+    target_version_id: UUID
+
+
+class BatchBody(ApiModel):
+    knowledge_base_id: UUID
+    kind: LifecycleKind
+    operation_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    concurrency: int | None = Field(default=None, ge=1, le=100)
 
 
 def _user_filter(body: FixedRagBody) -> FilterExpression | None:
@@ -146,6 +175,58 @@ def _stream_payload(event: RagStreamEvent) -> dict[str, object]:
     if event.answer is not None:
         payload["answer"] = _answer_payload(event.answer)
     return payload
+
+
+def _operation_payload(value: LifecycleOperationRecord) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "id": str(value.id),
+        "tenant_id": str(value.tenant_id),
+        "knowledge_base_id": str(value.knowledge_base_id),
+        "document_id": None if value.document_id is None else str(value.document_id),
+        "document_version_id": (
+            None if value.document_version_id is None else str(value.document_version_id)
+        ),
+        "requested_by": str(value.requested_by),
+        "kind": value.kind.value,
+        "idempotency_key": value.idempotency_key,
+        "reason": value.reason,
+        "status": value.status.value,
+        "progress": value.progress,
+        "attempts": value.attempts,
+        "fencing_token": value.fencing_token,
+        "next_attempt_at": value.next_attempt_at,
+        "purge_after": value.purge_after,
+        "failure_class": None if value.failure_class is None else value.failure_class.value,
+        "error": (
+            None
+            if value.error_code is None
+            else {"code": value.error_code, "message": value.error_message}
+        ),
+        "metadata": dict(value.metadata),
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
+    }
+
+
+def _batch_payload(value: LifecycleBatchRecord) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "id": str(value.id),
+        "tenant_id": str(value.tenant_id),
+        "knowledge_base_id": str(value.knowledge_base_id),
+        "requested_by": str(value.requested_by),
+        "kind": value.kind.value,
+        "idempotency_key": value.idempotency_key,
+        "concurrency": value.concurrency,
+        "operation_ids": [str(item) for item in value.operation_ids],
+        "status": value.status,
+        "succeeded": value.succeeded,
+        "failed": value.failed,
+        "cancelled": value.cancelled,
+        "created_at": value.created_at,
+        "updated_at": value.updated_at,
+    }
 
 
 def _context(
@@ -248,9 +329,152 @@ def build_router(runtime: R2Runtime) -> APIRouter:
                 if value.error_code is None
                 else {"code": value.error_code, "message": value.error_message}
             ),
-            "operation_id": None,
+            "operation_id": None if value.operation_id is None else str(value.operation_id),
             "schema_version": 1,
         }
+
+    @router.put("/documents/{document_id}/content", status_code=202, tags=["lifecycle"])
+    def update_document(
+        document_id: UUID,
+        file: Annotated[UploadFile, File()],
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+        reason: Annotated[str, Header(alias="X-Lifecycle-Reason")],
+        chunk_method: Annotated[str, Form()] = "general",
+    ) -> dict[str, object]:
+        content = file.file.read(runtime.knowledge.max_upload_bytes + 1)
+        submitted = runtime.lifecycle.update(
+            context,
+            document_id=DocumentId(document_id),
+            file_name=file.filename or "source",
+            media_type=file.content_type or "application/octet-stream",
+            content=content,
+            idempotency_key=idempotency_key,
+            reason=reason,
+            chunk_method=chunk_method,
+        )
+        return _operation_payload(submitted.operation)
+
+    @router.post("/documents/{document_id}/reparse", status_code=202, tags=["lifecycle"])
+    def reparse_document(
+        document_id: UUID,
+        body: ReparseBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        return _operation_payload(
+            runtime.lifecycle.reparse(
+                context,
+                document_id=DocumentId(document_id),
+                idempotency_key=idempotency_key,
+                reason=body.reason,
+                chunk_method=body.chunk_method,
+            ).operation
+        )
+
+    @router.delete("/documents/{document_id}", status_code=202, tags=["lifecycle"])
+    def delete_document(
+        document_id: UUID,
+        body: LifecycleReasonBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        return _operation_payload(
+            runtime.lifecycle.delete(
+                context,
+                document_id=DocumentId(document_id),
+                idempotency_key=idempotency_key,
+                reason=body.reason,
+            ).operation
+        )
+
+    @router.post("/documents/{document_id}/restore", status_code=202, tags=["lifecycle"])
+    def restore_document(
+        document_id: UUID,
+        body: LifecycleReasonBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        return _operation_payload(
+            runtime.lifecycle.restore(
+                context,
+                document_id=DocumentId(document_id),
+                idempotency_key=idempotency_key,
+                reason=body.reason,
+            ).operation
+        )
+
+    @router.post("/documents/{document_id}/rollback", status_code=202, tags=["lifecycle"])
+    def rollback_document(
+        document_id: UUID,
+        body: RollbackBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        return _operation_payload(
+            runtime.lifecycle.rollback(
+                context,
+                document_id=DocumentId(document_id),
+                target_version_id=DocumentVersionId(body.target_version_id),
+                idempotency_key=idempotency_key,
+                reason=body.reason,
+            ).operation
+        )
+
+    @router.post(
+        "/knowledge-bases/{knowledge_base_id}/rebuild", status_code=202, tags=["lifecycle"]
+    )
+    def rebuild_knowledge_base(
+        knowledge_base_id: UUID,
+        body: LifecycleReasonBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        return _operation_payload(
+            runtime.lifecycle.rebuild(
+                context,
+                knowledge_base_id=KnowledgeBaseId(knowledge_base_id),
+                idempotency_key=idempotency_key,
+                reason=body.reason,
+            ).operation
+        )
+
+    @router.get("/lifecycle-operations/{operation_id}", tags=["lifecycle"])
+    def get_lifecycle_operation(
+        operation_id: UUID,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+    ) -> dict[str, object]:
+        return _operation_payload(runtime.lifecycle.get(context, OperationId(operation_id)))
+
+    @router.post("/lifecycle-operations/{operation_id}/cancel", tags=["lifecycle"])
+    def cancel_lifecycle_operation(
+        operation_id: UUID,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+    ) -> dict[str, object]:
+        return _operation_payload(runtime.lifecycle.cancel(context, OperationId(operation_id)))
+
+    @router.post("/lifecycle-batches", status_code=202, tags=["lifecycle"])
+    def create_lifecycle_batch(
+        body: BatchBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    ) -> dict[str, object]:
+        value = runtime.lifecycle.create_batch(
+            context,
+            knowledge_base_id=KnowledgeBaseId(body.knowledge_base_id),
+            kind=body.kind,
+            operation_ids=tuple(OperationId(item) for item in body.operation_ids),
+            idempotency_key=idempotency_key,
+            concurrency=body.concurrency,
+        )
+        return _batch_payload(value)
+
+    @router.get("/lifecycle-batches/{batch_id}", tags=["lifecycle"])
+    def get_lifecycle_batch(
+        batch_id: UUID,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+    ) -> dict[str, object]:
+        return _batch_payload(runtime.lifecycle.get_batch(context, BatchId(batch_id)))
 
     @router.post("/rag/query", tags=["knowledge"])
     def fixed_rag(
@@ -369,6 +593,8 @@ def install_error_handlers(app: object) -> None:
     active.add_exception_handler(ResourceNotFound, handler("not_found", 404))
     active.add_exception_handler(AccessDenied, handler("forbidden", 403))
     active.add_exception_handler(IdempotencyConflict, handler("idempotency_conflict", 409))
+    active.add_exception_handler(LifecycleConflict, handler("lifecycle_conflict", 409))
+    active.add_exception_handler(LifecycleCancelled, handler("lifecycle_cancelled", 409))
     active.add_exception_handler(UnsupportedDocument, handler("unsupported_document", 415))
     active.add_exception_handler(SearchDependencyError, handler("search_dependency_failed", 503))
     active.add_exception_handler(ModelTimeout, handler("model_timeout", 504))

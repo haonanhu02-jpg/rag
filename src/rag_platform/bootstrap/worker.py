@@ -14,10 +14,7 @@ def run(runtime: R2Runtime | None = None) -> int:
     if runtime is None:
         Settings.from_environment()
         return 0
-    job_id = runtime.repository.next_pending_job()
-    if job_id is None:
-        return 0
-    runtime.ingestion.run(job_id)
+    runtime.lifecycle_worker.run_once()
     return 0
 
 

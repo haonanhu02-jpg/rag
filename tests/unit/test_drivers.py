@@ -14,6 +14,7 @@ from rag_platform.compatibility import (
     R3NewDriver,
     R4NewDriver,
     R5NewDriver,
+    R6NewDriver,
     SubprocessDriver,
 )
 from rag_platform.compatibility.drivers import DriverProtocolError
@@ -79,6 +80,17 @@ def test_r4_and_r5_drivers_overlay_only_evidenced_capabilities() -> None:
     assert r4.output["stage"] == "R4"
     assert isinstance(r5.output, dict)
     assert r5.output["implementation_status"] == "implemented"
+    assert future.status is DriverStatus.NOT_IMPLEMENTED
+
+
+def test_r6_driver_reports_complete_lifecycle_without_overclaiming_r7() -> None:
+    lifecycle = R6NewDriver().invoke(DriverRequest("CAP-26", "CAP-26-BASELINE"))
+    prior = R6NewDriver().invoke(DriverRequest("CAP-27", "CAP-27-BASELINE"))
+    future = R6NewDriver().invoke(DriverRequest("CAP-28", "CAP-28-BASELINE"))
+    assert isinstance(lifecycle.output, dict)
+    assert lifecycle.output["implementation_status"] == "implemented"
+    assert lifecycle.output["stage"] == "R6"
+    assert prior.status is DriverStatus.SUCCEEDED
     assert future.status is DriverStatus.NOT_IMPLEMENTED
 
 
