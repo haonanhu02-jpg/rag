@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+from dataclasses import replace
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -16,7 +18,14 @@ from rag_platform.domain.identifiers import (
     TenantId,
     TraceId,
 )
-from rag_platform.modules.grounded_rag.contracts import CitationIntegrityError, EvidenceStatus
+from rag_platform.modules.grounded_rag.contracts import (
+    CitationIntegrityError,
+    EvidenceItem,
+    EvidenceStatus,
+    GenerationBudget,
+    RagBoundingBox,
+    RagStreamEvent,
+)
 from rag_platform.modules.grounded_rag.evidence import (
     EvidenceSufficiencyPolicy,
     build_evidence_package,
@@ -121,6 +130,75 @@ def test_generated_citations_fail_closed_on_unknown_revoked_or_cross_scope_evide
         validate_generated_citations(
             "answer [9]",
             package,
+            authority=_Authority(),
+            context=_context(),
+            knowledge_base_ids=(_kb(),),
+        )
+
+
+def test_evidence_contracts_and_malformed_source_locations_fail_safely() -> None:
+    with pytest.raises(ValueError, match="within"):
+        EvidenceSufficiencyPolicy(minimum_normalized_score=1.1)
+    with pytest.raises(ValueError, match="context"):
+        build_evidence_package(
+            "q", _trace(), (), policy=EvidenceSufficiencyPolicy(), max_context_characters=0
+        )
+    with pytest.raises(ValueError, match="budget"):
+        GenerationBudget(max_input_tokens=0)
+    with pytest.raises(ValueError, match="dimensions"):
+        RagBoundingBox(1, 1, 0, 2, "pixels")
+    with pytest.raises(ValueError, match="coordinate"):
+        RagBoundingBox(0, 0, 1, 1, " ")
+    with pytest.raises(ValueError, match="stream"):
+        RagStreamEvent(-1, "")
+
+    citation = build_evidence_package(
+        "q",
+        _trace(),
+        (_hit(1),),
+        policy=EvidenceSufficiencyPolicy(),
+        max_context_characters=1000,
+    ).items[0].citation
+    with pytest.raises(ValueError, match="quote"):
+        replace(citation, quote=" ")
+    with pytest.raises(ValueError, match="page number"):
+        replace(citation, page_number=0)
+    with pytest.raises(ValueError, match="requires"):
+        replace(citation, bounding_box=RagBoundingBox(0, 0, 1, 1, "pixels"))
+    with pytest.raises(ValueError, match="evidence item"):
+        EvidenceItem(0, _hit(1), citation, 2.0)
+
+    malformed = (
+        _hit(1, score=math.inf, source={"page_start": "x", "bounding_box": "[]"}),
+        _hit(2, source={"page_start": "-1", "bounding_box": "not-json"}),
+    )
+    package = build_evidence_package(
+        "q",
+        _trace(),
+        malformed,
+        policy=EvidenceSufficiencyPolicy(),
+        max_context_characters=1000,
+    )
+    assert package.items[0].normalized_score == 0
+    assert all(item.citation.page_number is None for item in package.items)
+
+
+def test_context_bound_and_corrupted_internal_citation_are_rejected() -> None:
+    package = build_evidence_package(
+        "q",
+        _trace(),
+        (_hit(1), _hit(2)),
+        policy=EvidenceSufficiencyPolicy(),
+        max_context_characters=400,
+    )
+    assert len(package.items) == 1
+    item = package.items[0]
+    corrupted = replace(item, citation=replace(item.citation, trace_id=TraceId(UUID(int=999))))
+    broken_package = replace(package, items=(corrupted,))
+    with pytest.raises(CitationIntegrityError, match="quote or trace"):
+        validate_generated_citations(
+            "answer [1]",
+            broken_package,
             authority=_Authority(),
             context=_context(),
             knowledge_base_ids=(_kb(),),

@@ -14,3 +14,6 @@ def test_deterministic_answer_metrics_are_hand_checkable() -> None:
     assert lexical_faithfulness("relay reset [1]", ("relay reset procedure",)) == 1.0
     assert refusal_accuracy(True, "no_evidence") == 1.0
     assert refusal_accuracy(True, "answered") == 0.0
+    assert citation_precision_recall(frozenset(), frozenset()) == (1.0, 1.0)
+    assert citation_precision_recall(frozenset(), frozenset({"a"})) == (0.0, 0.0)
+    assert lexical_faithfulness("[1]", ("anything",)) == 1.0

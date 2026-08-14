@@ -12,6 +12,7 @@ from rag_platform.modules.model_runtime.contracts import (
     ChatStreamChunk,
     EmbeddingRequest,
     EmbeddingResult,
+    InvalidModelOutput,
     JsonValue,
     ModelKind,
     ModelRegistration,
@@ -63,7 +64,7 @@ class FakeModelRuntime:
     def stream_chat(self, request: ChatRequest) -> Iterator[ChatStreamChunk]:
         result = self.chat(request)
         if result.structured is not None:
-            raise ValueError("structured fake responses cannot be streamed")
+            raise InvalidModelOutput("structured fake responses cannot be streamed")
         parts = re.findall(r"\S+\s*", result.text)
         for part in parts:
             yield ChatStreamChunk(result.model_id, part)

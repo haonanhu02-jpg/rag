@@ -233,7 +233,7 @@ class GroundedRag:
                     yield RagStreamEvent(
                         sequence,
                         "error",
-                        attributes={"code": _stream_error_code(exc), "model_id": model_id},
+                        attributes={"code": _started_stream_error_code(exc), "model_id": model_id},
                     )
                     return
                 text = "".join(answer_parts)
@@ -253,7 +253,7 @@ class GroundedRag:
                     yield RagStreamEvent(
                         sequence,
                         "error",
-                        attributes={"code": _stream_error_code(exc), "model_id": model_id},
+                        attributes={"code": _started_stream_error_code(exc), "model_id": model_id},
                     )
                     return
                 completed = self._answer(
@@ -479,4 +479,12 @@ def _stream_error_code(error: Exception) -> str:
         return "search_dependency_failed"
     if isinstance(error, ModelRuntimeError):
         return "model_dependency_failed"
+    return "stream_interrupted"
+
+
+def _started_stream_error_code(error: Exception) -> str:
+    if isinstance(error, CitationIntegrityError):
+        return "citation_integrity_failed"
+    if isinstance(error, GenerationBudgetExceeded):
+        return "generation_budget_exceeded"
     return "stream_interrupted"
