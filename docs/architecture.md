@@ -1,8 +1,8 @@
 ---
 document_id: RAG-GREENFIELD-TARGET-ARCHITECTURE
-version: "2.0.0"
+version: "2.1.0"
 status: accepted_for_implementation
-last_updated_at: "2026-08-13"
+last_updated_at: "2026-08-14"
 ---
 
 # `rag` 目标架构
@@ -284,6 +284,11 @@ flowchart LR
 
 不使用跨存储 2PC。通过事务 Outbox、确定性 ID、幂等消费者、候选索引、CAS/fencing、
 补偿和 reconciliation 保证最终一致，并始终以 PostgreSQL 活动版本过滤查询结果。
+
+R6 已实现该边界的独立部署 Profile：Worker 直接租约消费 PostgreSQL Outbox，ObjectStore 使用
+tenant-contained 文件系统，Search 使用 Elasticsearch。它们分别满足 MessageQueue、ObjectStore
+与 Search Projection 的语义；后续替换为托管队列、S3/MinIO 或 OpenSearch 不改变 Module
+Interface。R6 的完整状态机、失败语义和 API 见 [R6 执行记录](phases/r6-reliable-lifecycle.md)。
 
 ## 10. 架构验收条件
 

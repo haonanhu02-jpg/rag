@@ -1,0 +1,17 @@
+schema_version: 1
+stage: R6
+reference_commit: ce74c58e664275ff239bcbb8c841771bc4649557
+status_vocabulary:
+  - implemented
+  - not_implemented_in_new_repo
+capabilities:
+  CAP-23: implemented
+  CAP-24: implemented
+  CAP-25: implemented
+  CAP-26: implemented
+  CAP-38: implemented
+remaining_capabilities: not_implemented_in_new_repo
+limitations:
+  CAP-23: Provider-specific managed queues remain optional adapters; the default worker consumes the PostgreSQL transactional Outbox directly.
+  CAP-25: Physical purge requires the retention deadline and Maintainer apply mode; Maintainer is dry-run by default.
+  CAP-38: Horizontal throughput and production SLO tuning remain R9; correctness, leases, retry and kill recovery are implemented in R6.

@@ -33,6 +33,11 @@ def test_postgres_migration_round_trip() -> None:
             "index_versions",
             "chunk_embeddings",
             "retrieval_traces",
+            "ingestion_tasks",
+            "index_routes",
+            "lifecycle_operations",
+            "outbox_messages",
+            "lifecycle_batches",
         } <= set(inspect(engine).get_table_names())
     finally:
         engine.dispose()

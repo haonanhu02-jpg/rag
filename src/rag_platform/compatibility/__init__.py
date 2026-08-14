@@ -17,6 +17,7 @@ from rag_platform.compatibility.drivers import (
     R3NewDriver,
     R4NewDriver,
     R5NewDriver,
+    R6NewDriver,
     SubprocessDriver,
 )
 
@@ -34,6 +35,7 @@ __all__ = [
     "R3NewDriver",
     "R4NewDriver",
     "R5NewDriver",
+    "R6NewDriver",
     "SubprocessDriver",
     "compare_results",
 ]

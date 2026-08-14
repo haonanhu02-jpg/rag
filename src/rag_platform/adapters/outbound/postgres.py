@@ -44,6 +44,7 @@ from rag_platform.domain.identifiers import (
     IndexVersionId,
     JobId,
     KnowledgeBaseId,
+    OperationId,
     TenantId,
     TraceId,
 )
@@ -59,6 +60,7 @@ from rag_platform.modules.knowledge.contracts import (
     StagedGeneration,
     UploadSubmission,
 )
+from rag_platform.modules.lifecycle.contracts import LifecycleConflict
 
 metadata = MetaData()
 _STABLE_NAMESPACE = UUID("c4e188ff-9b5e-52ba-94e7-0ef263d4c715")
@@ -93,6 +95,9 @@ documents = Table(
     Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
     Column("external_key", String(500), nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("purge_after", DateTime(timezone=True), nullable=True),
+    Column("revision_token", Integer, nullable=False, server_default="0"),
 )
 document_versions = Table(
     "document_versions",
@@ -109,6 +114,8 @@ document_versions = Table(
     Column("object_key", String(1000), nullable=False),
     Column("size_bytes", BigInteger, nullable=False),
     Column("activated_at", DateTime(timezone=True), nullable=True),
+    Column("superseded_at", DateTime(timezone=True), nullable=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
     Column("chunk_method", String(32), nullable=False, server_default="general"),
     Column("parser_name", String(100), nullable=True),
     Column("parser_version", String(50), nullable=True),
@@ -116,6 +123,9 @@ document_versions = Table(
     Column("parse_warnings", JSONB, nullable=False, server_default="[]"),
     Column("page_count", Integer, nullable=True),
     Column("normalized_sha256", String(64), nullable=True),
+    UniqueConstraint(
+        "tenant_id", "document_id", "revision", name="uq_document_versions_revision"
+    ),
 )
 ingestion_jobs = Table(
     "ingestion_jobs",
@@ -135,6 +145,29 @@ ingestion_jobs = Table(
     Column("error_message", String(1000), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column("operation_id", PGUUID(as_uuid=True), nullable=True),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("max_attempts", Integer, nullable=False, server_default="6"),
+    Column("next_attempt_at", DateTime(timezone=True), nullable=True),
+    Column("lease_owner", String(200), nullable=True),
+    Column("lease_expires_at", DateTime(timezone=True), nullable=True),
+    Column("cancellation_requested", Boolean, nullable=False, server_default="false"),
+    Column("failure_class", String(32), nullable=True),
+)
+ingestion_tasks = Table(
+    "ingestion_tasks",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("job_id", PGUUID(as_uuid=True), nullable=False),
+    Column("task", String(50), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("progress", Float, nullable=False, server_default="0"),
+    Column("error_message", String(1000), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("job_id", "task", name="uq_ingestion_tasks_job_task"),
 )
 upload_idempotency_keys = Table(
     "upload_idempotency_keys",
@@ -191,6 +224,21 @@ index_versions = Table(
     Column("chunk_count", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("fencing_token", Integer, nullable=False, server_default="0"),
+    Column("superseded_at", DateTime(timezone=True), nullable=True),
+    Column("purge_after", DateTime(timezone=True), nullable=True),
+    UniqueConstraint(
+        "tenant_id", "knowledge_base_id", "generation", name="uq_index_generation"
+    ),
+)
+index_routes = Table(
+    "index_routes",
+    metadata,
+    Column("tenant_id", PGUUID(as_uuid=True), primary_key=True),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), primary_key=True),
+    Column("active_index_version_id", PGUUID(as_uuid=True), nullable=False),
+    Column("fencing_token", Integer, nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
 )
 chunk_embeddings = Table(
     "chunk_embeddings",
@@ -225,6 +273,74 @@ retrieval_traces = Table(
     Column("error_code", String(100), nullable=True),
     Column("request_id", String(200), nullable=True),
     Column("index_version_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False, server_default="{}"),
+)
+
+lifecycle_operations = Table(
+    "lifecycle_operations",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("document_id", PGUUID(as_uuid=True), nullable=True),
+    Column("document_version_id", PGUUID(as_uuid=True), nullable=True),
+    Column("requested_by", PGUUID(as_uuid=True), nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("idempotency_key", String(300), nullable=False),
+    Column("request_sha256", String(64), nullable=False),
+    Column("reason", String(1000), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("progress", Float, nullable=False),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("fencing_token", Integer, nullable=False),
+    Column("next_attempt_at", DateTime(timezone=True), nullable=True),
+    Column("purge_after", DateTime(timezone=True), nullable=True),
+    Column("failure_class", String(32), nullable=True),
+    Column("error_code", String(100), nullable=True),
+    Column("error_message", String(1000), nullable=True),
+    Column("metadata", JSONB, nullable=False, server_default="{}"),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("tenant_id", "idempotency_key", name="uq_lifecycle_tenant_key"),
+)
+outbox_messages = Table(
+    "outbox_messages",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("message_id", String(200), nullable=False, unique=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("operation_id", PGUUID(as_uuid=True), nullable=False),
+    Column("event_type", String(100), nullable=False),
+    Column("aggregate_id", String(200), nullable=False),
+    Column("payload", JSONB, nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("max_attempts", Integer, nullable=False, server_default="6"),
+    Column("available_at", DateTime(timezone=True), nullable=False),
+    Column("lease_owner", String(200), nullable=True),
+    Column("lease_expires_at", DateTime(timezone=True), nullable=True),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("last_error", String(1000), nullable=True),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+lifecycle_batches = Table(
+    "lifecycle_batches",
+    metadata,
+    Column("id", PGUUID(as_uuid=True), primary_key=True),
+    Column("tenant_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_base_id", PGUUID(as_uuid=True), nullable=False),
+    Column("requested_by", PGUUID(as_uuid=True), nullable=False),
+    Column("kind", String(32), nullable=False),
+    Column("idempotency_key", String(300), nullable=False),
+    Column("concurrency", Integer, nullable=False, server_default="2"),
+    Column("operation_ids", ARRAY(PGUUID(as_uuid=True)), nullable=False),
+    Column("status", String(32), nullable=False),
+    Column("succeeded", Integer, nullable=False, server_default="0"),
+    Column("failed", Integer, nullable=False, server_default="0"),
+    Column("cancelled", Integer, nullable=False, server_default="0"),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+    UniqueConstraint("tenant_id", "idempotency_key", name="uq_lifecycle_batch_tenant_key"),
 )
 
 
@@ -422,7 +538,7 @@ class PostgresKnowledgeRepository:
                         document_versions.c.document_id == document_id.value,
                         document_versions.c.source_sha256 == source_sha256,
                         document_versions.c.chunk_method == chunk_method,
-                    )
+                    ).order_by(document_versions.c.revision).limit(1)
                 )
                 .mappings()
                 .one_or_none()
@@ -484,6 +600,30 @@ class PostgresKnowledgeRepository:
                     return UploadSubmission(self._job(prior_job), True)
             job_id = JobId(uuid5(_STABLE_NAMESPACE, f"job:{context.tenant_id}:{idempotency_key}"))
             trace_id = TraceId(uuid5(_STABLE_NAMESPACE, f"upload-trace:{job_id}"))
+            operation_id = OperationId(
+                uuid5(_STABLE_NAMESPACE, f"operation:{context.tenant_id}:{idempotency_key}")
+            )
+            message_uuid = uuid5(_STABLE_NAMESPACE, f"outbox:{operation_id}:ingestion.requested")
+            connection.execute(
+                insert(lifecycle_operations).values(
+                    id=operation_id.value,
+                    tenant_id=context.tenant_id.value,
+                    knowledge_base_id=knowledge_base_id.value,
+                    document_id=document_id.value,
+                    document_version_id=version_id.value,
+                    requested_by=context.actor_id.value,
+                    kind="ingest",
+                    idempotency_key=idempotency_key,
+                    request_sha256=request_sha256,
+                    reason="initial upload",
+                    status="pending",
+                    progress=0.0,
+                    fencing_token=1,
+                    metadata={"job_id": str(job_id)},
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
             connection.execute(
                 insert(ingestion_jobs).values(
                     id=job_id.value,
@@ -497,6 +637,51 @@ class PostgresKnowledgeRepository:
                     trace_id=trace_id.value,
                     status="pending",
                     progress=0.0,
+                    operation_id=operation_id.value,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            connection.execute(
+                insert(ingestion_tasks),
+                [
+                    {
+                        "id": uuid5(_STABLE_NAMESPACE, f"task:{job_id}:{task}"),
+                        "tenant_id": context.tenant_id.value,
+                        "job_id": job_id.value,
+                        "task": task,
+                        "status": "pending",
+                        "progress": 0.0,
+                        "created_at": now,
+                        "updated_at": now,
+                    }
+                    for task in (
+                        "load",
+                        "compile",
+                        "embed",
+                        "stage",
+                        "project",
+                        "validate",
+                        "publish",
+                    )
+                ],
+            )
+            connection.execute(
+                insert(outbox_messages).values(
+                    id=message_uuid,
+                    message_id=f"lifecycle:{operation_id}:ingestion.requested:v1",
+                    tenant_id=context.tenant_id.value,
+                    operation_id=operation_id.value,
+                    event_type="ingestion.requested",
+                    aggregate_id=str(document_id),
+                    payload={
+                        "tenant_id": str(context.tenant_id),
+                        "knowledge_base_id": str(knowledge_base_id),
+                        "document_id": str(document_id),
+                        "job_id": str(job_id),
+                    },
+                    status="pending",
+                    available_at=now,
                     created_at=now,
                     updated_at=now,
                 )
@@ -569,6 +754,10 @@ class PostgresKnowledgeRepository:
                 raise ResourceNotFound("ingestion job not found")
             if row["status"] == "succeeded":
                 return self._source(row)
+            if row["cancellation_requested"] or row["status"] == "cancelled":
+                from rag_platform.modules.lifecycle.contracts import LifecycleCancelled
+
+                raise LifecycleCancelled("ingestion was cancelled")
             connection.execute(
                 update(ingestion_jobs)
                 .where(ingestion_jobs.c.id == job_id.value)
@@ -627,7 +816,27 @@ class PostgresKnowledgeRepository:
                 .mappings()
                 .one_or_none()
             )
-            generation = 1 if active is None else int(active["generation"]) + 1
+            generation = cast(
+                int,
+                connection.scalar(
+                    select(func.coalesce(func.max(index_versions.c.generation), 0) + 1).where(
+                        index_versions.c.tenant_id == source.job.tenant_id.value,
+                        index_versions.c.knowledge_base_id
+                        == source.job.knowledge_base_id.value,
+                    )
+                ),
+            )
+            route = (
+                connection.execute(
+                    select(index_routes).where(
+                        index_routes.c.tenant_id == source.job.tenant_id.value,
+                        index_routes.c.knowledge_base_id == source.job.knowledge_base_id.value,
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            expected_fencing_token = 0 if route is None else int(route["fencing_token"])
             index_version_id = IndexVersionId(uuid4())
             connection.execute(
                 insert(index_versions).values(
@@ -639,6 +848,7 @@ class PostgresKnowledgeRepository:
                     embedding_model_id=embedding_model_id,
                     vector_dimensions=dimensions,
                     chunk_count=len(document.chunks),
+                    fencing_token=expected_fencing_token + 1,
                     created_at=now,
                 )
             )
@@ -768,7 +978,13 @@ class PostgresKnowledgeRepository:
                 .where(index_versions.c.id == index_version_id.value)
                 .values(chunk_count=total_count)
             )
-        return StagedGeneration(index_version_id, generation, total_count, dimensions)
+        return StagedGeneration(
+            index_version_id,
+            generation,
+            total_count,
+            dimensions,
+            expected_fencing_token,
+        )
 
     def validate_generation(self, value: StagedGeneration) -> None:
         with self._engine.connect() as connection:
@@ -784,6 +1000,47 @@ class PostgresKnowledgeRepository:
         self, source: IngestionSource, value: StagedGeneration, now: datetime
     ) -> IngestionJobRecord:
         with self._engine.begin() as connection:
+            route = (
+                connection.execute(
+                    select(index_routes)
+                    .where(
+                        index_routes.c.tenant_id == source.job.tenant_id.value,
+                        index_routes.c.knowledge_base_id == source.job.knowledge_base_id.value,
+                    )
+                    .with_for_update()
+                )
+                .mappings()
+                .one_or_none()
+            )
+            next_token = value.expected_fencing_token + 1
+            if route is None:
+                if value.expected_fencing_token != 0:
+                    raise LifecycleConflict("index route changed before activation")
+                connection.execute(
+                    insert(index_routes).values(
+                        tenant_id=source.job.tenant_id.value,
+                        knowledge_base_id=source.job.knowledge_base_id.value,
+                        active_index_version_id=value.index_version_id.value,
+                        fencing_token=next_token,
+                        updated_at=now,
+                    )
+                )
+            else:
+                changed = connection.execute(
+                    update(index_routes)
+                    .where(
+                        index_routes.c.tenant_id == source.job.tenant_id.value,
+                        index_routes.c.knowledge_base_id == source.job.knowledge_base_id.value,
+                        index_routes.c.fencing_token == value.expected_fencing_token,
+                    )
+                    .values(
+                        active_index_version_id=value.index_version_id.value,
+                        fencing_token=next_token,
+                        updated_at=now,
+                    )
+                )
+                if changed.rowcount != 1:
+                    raise LifecycleConflict("index activation lost its fencing token")
             connection.execute(
                 update(index_versions)
                 .where(
@@ -791,12 +1048,12 @@ class PostgresKnowledgeRepository:
                     index_versions.c.knowledge_base_id == source.job.knowledge_base_id.value,
                     index_versions.c.status == "active",
                 )
-                .values(status="superseded")
+                .values(status="superseded", superseded_at=now)
             )
             connection.execute(
                 update(index_versions)
                 .where(index_versions.c.id == value.index_version_id.value)
-                .values(status="active", published_at=now)
+                .values(status="active", published_at=now, fencing_token=next_token)
             )
             connection.execute(
                 update(document_versions)
@@ -806,7 +1063,7 @@ class PostgresKnowledgeRepository:
                     document_versions.c.status == "active",
                     document_versions.c.id != source.job.document_version_id.value,
                 )
-                .values(status="superseded")
+                .values(status="superseded", superseded_at=now)
             )
             connection.execute(
                 update(document_versions)
@@ -836,6 +1093,43 @@ class PostgresKnowledgeRepository:
                     status="failed",
                     error_code=code,
                     error_message=message,
+                    updated_at=now,
+                )
+            )
+
+    def mark_ingestion_task(
+        self,
+        job_id: JobId,
+        task: str,
+        *,
+        status: WorkStatus,
+        progress: float,
+        now: datetime,
+        error: str | None = None,
+    ) -> None:
+        with self._engine.begin() as connection:
+            if status is WorkStatus.RUNNING:
+                cancellation_requested = connection.scalar(
+                    select(ingestion_jobs.c.cancellation_requested).where(
+                        ingestion_jobs.c.id == job_id.value
+                    )
+                )
+                if cancellation_requested:
+                    from rag_platform.modules.lifecycle.contracts import LifecycleCancelled
+
+                    raise LifecycleCancelled("ingestion was cancelled between tasks")
+            connection.execute(
+                update(ingestion_tasks)
+                .where(ingestion_tasks.c.job_id == job_id.value, ingestion_tasks.c.task == task)
+                .values(
+                    status=status.value,
+                    attempts=(
+                        ingestion_tasks.c.attempts + 1
+                        if status is WorkStatus.RUNNING
+                        else ingestion_tasks.c.attempts
+                    ),
+                    progress=progress,
+                    error_message=error,
                     updated_at=now,
                 )
             )
@@ -1060,6 +1354,16 @@ class PostgresKnowledgeRepository:
             cast(datetime, row["updated_at"]),
             cast(str | None, row["error_code"]),
             cast(str | None, row["error_message"]),
+            (
+                None
+                if row.get("operation_id") is None
+                else OperationId(row["operation_id"])
+            ),
+            int(row.get("attempts", 0)),
+            int(row.get("max_attempts", 6)),
+            cast(datetime | None, row.get("next_attempt_at")),
+            bool(row.get("cancellation_requested", False)),
+            cast(str | None, row.get("failure_class")),
         )
 
     @classmethod

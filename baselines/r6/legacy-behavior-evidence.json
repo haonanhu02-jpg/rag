@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "stage": "R6",
+  "reference_commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "source_reuse": "none",
+  "observations": [
+    {
+      "capability": "CAP-23",
+      "behavior": "ingestion jobs expose task progress and execute outside the request",
+      "path": "src/ragflow_agent/knowledge/application/ingestion.py"
+    },
+    {
+      "capability": "CAP-24",
+      "behavior": "update and reparse register immutable versions through idempotent commands",
+      "path": "src/ragflow_agent/knowledge/application/lifecycle/update.py"
+    },
+    {
+      "capability": "CAP-25",
+      "behavior": "delete is a tombstone with restore and later physical purge",
+      "path": "src/ragflow_agent/knowledge/application/lifecycle/delete.py"
+    },
+    {
+      "capability": "CAP-26",
+      "behavior": "operations use bounded retry, cancellation, Outbox and dead-letter states",
+      "path": "src/ragflow_agent/knowledge/domain/lifecycle.py"
+    },
+    {
+      "capability": "CAP-38",
+      "behavior": "rebuild and reconciliation recover cross-store lifecycle side effects",
+      "path": "src/ragflow_agent/knowledge/application/lifecycle/reconcile.py"
+    }
+  ]
+}

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import uuid4
 
 from rag_platform.adapters.outbound.document_parsers import build_document_parsers
 from rag_platform.adapters.outbound.elasticsearch import ElasticsearchSearchAdapter
+from rag_platform.adapters.outbound.lifecycle_postgres import PostgresLifecycleRepository
 from rag_platform.adapters.outbound.object_store import FileObjectStore
 from rag_platform.adapters.outbound.ocr import TesseractOcrAdapter
 from rag_platform.adapters.outbound.postgres import (
@@ -19,6 +21,11 @@ from rag_platform.modules.grounded_rag import GenerationBudget, GroundedRag
 from rag_platform.modules.knowledge import KnowledgeService
 from rag_platform.modules.knowledge.compiler import DocumentCompiler
 from rag_platform.modules.knowledge.contracts import OcrEngine
+from rag_platform.modules.lifecycle import (
+    LifecycleCoordinator,
+    LifecycleReconciler,
+    LifecycleWorker,
+)
 from rag_platform.modules.model_runtime import FakeModelRuntime
 from rag_platform.modules.model_runtime.contracts import ModelKind, ModelRegistration
 from rag_platform.modules.retrieval import AuthorizedRetrieval
@@ -35,6 +42,7 @@ class R2Runtime:
     def __init__(self, settings: Settings, *, ocr: OcrEngine | None = None) -> None:
         self.engine = create_postgres_engine(settings.database_url)
         self.repository = PostgresKnowledgeRepository(self.engine)
+        self.lifecycle_repository = PostgresLifecycleRepository(self.engine)
         self.search = ElasticsearchSearchAdapter(
             settings.elasticsearch_url,
             index_name=settings.elasticsearch_index,
@@ -85,6 +93,26 @@ class R2Runtime:
             embedding_model_id=EMBEDDING_MODEL_ID,
             clock=self.clock,
             search_projection=self.search,
+        )
+        self.lifecycle = LifecycleCoordinator(
+            repository=self.lifecycle_repository,
+            object_store=self.object_store,
+            clock=self.clock,
+            max_upload_bytes=settings.max_upload_bytes,
+        )
+        self.lifecycle_worker = LifecycleWorker(
+            repository=self.lifecycle_repository,
+            ingestion=self.ingestion,
+            projection=self.search,
+            object_store=self.object_store,
+            clock=self.clock,
+            worker_id=f"worker-{uuid4()}",
+        )
+        self.lifecycle_reconciler = LifecycleReconciler(
+            repository=self.lifecycle_repository,
+            projection=self.search,
+            object_store=self.object_store,
+            clock=self.clock,
         )
         self.retrieval = AuthorizedRetrieval(
             repository=self.repository,

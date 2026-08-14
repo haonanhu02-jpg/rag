@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
+from uuid import UUID
 
 from rag_platform.domain.identifiers import TenantId
 
@@ -32,3 +33,24 @@ class FileObjectStore:
     def get(self, *, tenant_id: TenantId, key: str) -> bytes | None:
         target = self._path(tenant_id, key)
         return target.read_bytes() if target.is_file() else None
+
+    def delete(self, *, tenant_id: TenantId, key: str) -> None:
+        target = self._path(tenant_id, key)
+        if target.is_file():
+            target.unlink()
+
+    def list_objects(self) -> tuple[tuple[TenantId, str], ...]:
+        values: list[tuple[TenantId, str]] = []
+        for tenant_root in self._root.iterdir():
+            if not tenant_root.is_dir():
+                continue
+            try:
+                tenant_id = TenantId(UUID(tenant_root.name))
+            except ValueError:
+                continue
+            values.extend(
+                (tenant_id, target.relative_to(tenant_root).as_posix())
+                for target in tenant_root.rglob("*")
+                if target.is_file()
+            )
+        return tuple(sorted(values, key=lambda item: (str(item[0]), item[1])))

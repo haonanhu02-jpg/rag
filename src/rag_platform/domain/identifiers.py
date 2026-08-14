@@ -62,5 +62,13 @@ class OperationId(Identifier):
     pass
 
 
+class OutboxMessageId(Identifier):
+    pass
+
+
+class BatchId(Identifier):
+    pass
+
+
 class AgentRunId(Identifier):
     pass
