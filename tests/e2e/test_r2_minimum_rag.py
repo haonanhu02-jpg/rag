@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Iterator
 from pathlib import Path
@@ -122,9 +123,13 @@ def test_upload_ingest_query_citation_trace_and_idempotency(
     assert answer.status_code == 200
     body = answer.json()
     assert body["status"] == "answered"
+    assert body["evidence_status"] == "sufficient"
     assert "[1]" in body["answer"]
     assert body["citations"][0]["document_version_id"] == first.json()["document_version_id"]
     assert body["citations"][0]["quote"]
+    assert body["citations"][0]["trace_id"] == body["trace_id"]
+    assert body["citations"][0]["schema_version"] == 2
+    assert body["citations"][0]["source_uri"] == "manual.md"
     trace = client.get(f"/v1/retrieval-traces/{body['trace_id']}", headers=headers)
     assert trace.json()["authorization_applied"] is True
     assert trace.json()["candidate_count"] >= 1
@@ -153,7 +158,33 @@ def test_upload_ingest_query_citation_trace_and_idempotency(
             .mappings()
             .one()
         )
-    assert counts == {"versions": 1, "chunks": 1}
+    assert dict(counts) == {"versions": 1, "chunks": 1}
+
+    streamed = client.post(
+        "/v1/rag/query/stream",
+        headers=headers,
+        json={
+            "question": "故障复位应该检查什么?",
+            "knowledge_base_ids": [knowledge_base_id],
+            "top_k": 5,
+            "top_n": 1,
+        },
+    )
+    assert streamed.status_code == 200
+    assert streamed.headers["content-type"].startswith("text/event-stream")
+    events = [
+        json.loads(line.removeprefix("data: "))
+        for line in streamed.text.splitlines()
+        if line.startswith("data: ")
+    ]
+    assert [event["sequence"] for event in events] == list(range(len(events)))
+    assert events[0]["event"] == "retrieval_started"
+    assert events[-2]["event"] == "citations"
+    assert events[-1]["event"] == "completed"
+    assert events[-1]["answer"]["evidence_status"] == "sufficient"
+    assert events[-1]["answer"]["citations"][0]["trace_id"] == (
+        events[-1]["answer"]["trace_id"]
+    )
 
 
 def test_hard_filters_hide_cross_tenant_wrong_kb_unpublished_and_deleted(

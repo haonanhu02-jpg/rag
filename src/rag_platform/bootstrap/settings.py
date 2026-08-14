@@ -19,6 +19,12 @@ class Settings:
     max_upload_bytes: int = 10 * 1024 * 1024
     elasticsearch_url: str = "http://localhost:9200"
     elasticsearch_index: str = "rag-chunks-v1"
+    rag_max_context_characters: int = 12_000
+    rag_minimum_evidence_score: float = 0.0
+    rag_model_timeout_seconds: float = 30.0
+    rag_max_input_tokens: int = 16_000
+    rag_max_output_tokens: int = 2_000
+    rag_max_cost_microunits: int = 1_000_000
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -32,8 +38,22 @@ class Settings:
         elasticsearch_index = os.environ.get("RAG_ELASTICSEARCH_INDEX", "rag-chunks-v1")
         try:
             max_upload_bytes = int(os.environ.get("RAG_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+            rag_max_context_characters = int(
+                os.environ.get("RAG_MAX_CONTEXT_CHARACTERS", "12000")
+            )
+            rag_minimum_evidence_score = float(
+                os.environ.get("RAG_MINIMUM_EVIDENCE_SCORE", "0")
+            )
+            rag_model_timeout_seconds = float(
+                os.environ.get("RAG_MODEL_TIMEOUT_SECONDS", "30")
+            )
+            rag_max_input_tokens = int(os.environ.get("RAG_MAX_INPUT_TOKENS", "16000"))
+            rag_max_output_tokens = int(os.environ.get("RAG_MAX_OUTPUT_TOKENS", "2000"))
+            rag_max_cost_microunits = int(
+                os.environ.get("RAG_MAX_COST_MICROUNITS", "1000000")
+            )
         except ValueError as exc:
-            raise ConfigurationError("RAG_MAX_UPLOAD_BYTES must be an integer") from exc
+            raise ConfigurationError("numeric RAG settings are invalid") from exc
         settings = cls(
             environment,
             database_url,
@@ -42,6 +62,12 @@ class Settings:
             max_upload_bytes,
             elasticsearch_url,
             elasticsearch_index,
+            rag_max_context_characters,
+            rag_minimum_evidence_score,
+            rag_model_timeout_seconds,
+            rag_max_input_tokens,
+            rag_max_output_tokens,
+            rag_max_cost_microunits,
         )
         settings.validate()
         return settings
@@ -61,3 +87,15 @@ class Settings:
             raise ConfigurationError("RAG_ELASTICSEARCH_URL must use HTTP or HTTPS")
         if not self.elasticsearch_index.strip():
             raise ConfigurationError("RAG_ELASTICSEARCH_INDEX must not be empty")
+        if self.rag_max_context_characters < 1:
+            raise ConfigurationError("RAG_MAX_CONTEXT_CHARACTERS must be positive")
+        if not 0 <= self.rag_minimum_evidence_score <= 1:
+            raise ConfigurationError("RAG_MINIMUM_EVIDENCE_SCORE must be within [0, 1]")
+        if self.rag_model_timeout_seconds <= 0:
+            raise ConfigurationError("RAG_MODEL_TIMEOUT_SECONDS must be positive")
+        if min(
+            self.rag_max_input_tokens,
+            self.rag_max_output_tokens,
+            self.rag_max_cost_microunits,
+        ) < 1:
+            raise ConfigurationError("RAG generation budgets must be positive")

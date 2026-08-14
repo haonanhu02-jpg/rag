@@ -14,10 +14,11 @@
 
 ## 当前状态
 
-R0–R4 已完成。新项目可独立处理 PDF、DOCX、PPTX、XLSX、TXT、Markdown、HTML 与图片，
+R0–R5 已完成。新项目可独立处理 PDF、DOCX、PPTX、XLSX、TXT、Markdown、HTML 与图片，
 统一保留 Block 结构、页码、坐标、顺序、解析告警和媒体来源，并提供九类稳定 Chunk Method、
 Embedding、pgvector 索引、Elasticsearch BM25/kNN 混合召回、RRF、Rerank、递归元数据过滤、
-PostgreSQL 最终授权校验、有限空结果回退、非流式回答、Citation 和完整 Retrieval Trace。
+PostgreSQL 最终授权校验、四态证据判定、模型降级与预算、JSON/SSE 固定 RAG、发布前 Citation
+二次校验和完整 Retrieval Trace。
 CAP-35 当前只完成多模态解析基础；完整多模态 RAG 仍在 R8。
 
 ## 文档
@@ -30,6 +31,7 @@ CAP-35 当前只完成多模态解析基础；完整多模态 RAG 仍在 R8。
 - [R2 执行记录](docs/phases/r2-minimum-rag.md)
 - [R3 执行记录](docs/phases/r3-document-compiler.md)
 - [R4 执行记录](docs/phases/r4-authorized-retrieval.md)
+- [R5 执行记录](docs/phases/r5-grounded-rag.md)
 - [风险登记](docs/risks.md)
 - [ADR-001：采用绿地仓库](docs/adr/ADR-001-greenfield-repository.md)
 - [ADR-002：LangChain/LangGraph 职责边界](docs/adr/ADR-002-framework-responsibilities.md)

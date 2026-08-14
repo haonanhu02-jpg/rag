@@ -23,7 +23,7 @@ def create_app(settings: Settings | None = None, runtime: R2Runtime | None = Non
         yield
         active_runtime.close()
 
-    app = FastAPI(title="RAG Platform", version="0.4.0", lifespan=lifespan)
+    app = FastAPI(title="RAG Platform", version="0.5.0", lifespan=lifespan)
     app.include_router(build_router(active_runtime))
     install_error_handlers(app)
     app.state.r2_runtime = active_runtime

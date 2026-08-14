@@ -15,6 +15,8 @@ from rag_platform.compatibility.drivers import (
     PinnedReferenceDriver,
     R2MinimumNewDriver,
     R3NewDriver,
+    R4NewDriver,
+    R5NewDriver,
     SubprocessDriver,
 )
 
@@ -30,6 +32,8 @@ __all__ = [
     "PinnedReferenceDriver",
     "R2MinimumNewDriver",
     "R3NewDriver",
+    "R4NewDriver",
+    "R5NewDriver",
     "SubprocessDriver",
     "compare_results",
 ]

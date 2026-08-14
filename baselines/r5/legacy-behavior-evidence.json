@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "reference_commit": "ce74c58e664275ff239bcbb8c841771bc4649557",
+  "observations": [
+    {
+      "behavior": "fixed_rag_retrieval_bounded_context_answer_and_no_evidence",
+      "path": "src/ragflow_agent/knowledge/application/fixed_rag.py",
+      "git_blob": "d0404a1640c0ca1a60080eff8199ea34a40473df"
+    },
+    {
+      "behavior": "version_bound_citation_with_page_bbox_and_source_location",
+      "path": "src/ragflow_agent/knowledge/domain/retrieval.py",
+      "git_blob": "f6e41ec66238964ce28a7710d2004f1b82ebe348"
+    },
+    {
+      "behavior": "provider_neutral_generation_contract_with_usage",
+      "path": "src/ragflow_agent/knowledge/ports/generation.py",
+      "git_blob": "8f2d7f0bbc77e8578d9c8bf089be13d9d8930df1"
+    },
+    {
+      "behavior": "fixed_rag_http_contract",
+      "path": "src/ragflow_agent/api/routes/knowledge.py",
+      "git_blob": "a813b5b6711e8a99b8aed1cb11f5be81af502971"
+    },
+    {
+      "behavior": "faithfulness_refusal_and_citation_quality_metrics",
+      "path": "src/ragflow_agent/evaluation/answers.py",
+      "git_blob": "362daa7388b786a1b225d1f15cb30ba465fdfa0f"
+    }
+  ],
+  "approved_improvements": [
+    "Evidence status is a system-owned four-state policy instead of an implicit candidate-count decision.",
+    "Citations are revalidated against PostgreSQL authority after generation and before publication.",
+    "The additive SSE endpoint has ordered terminal events, cancellation and interruption semantics."
+  ],
+  "new_system_tests": [
+    "tests/unit/test_r5_evidence.py",
+    "tests/unit/test_r5_grounded_rag.py",
+    "tests/evaluation/test_r5_answer_quality.py",
+    "tests/e2e/test_r2_minimum_rag.py",
+    "tests/contract/test_model_runtime.py"
+  ],
+  "source_reuse": "none"
+}

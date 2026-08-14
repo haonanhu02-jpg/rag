@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
@@ -137,6 +137,14 @@ class ChatResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ChatStreamChunk:
+    model_id: str
+    delta: str
+    usage: ModelUsage = ModelUsage()
+    finish_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class EmbeddingResult:
     model_id: str
     vectors: tuple[tuple[float, ...], ...]
@@ -162,6 +170,8 @@ class RerankResult:
 
 class ModelRuntime(Protocol):
     def chat(self, request: ChatRequest) -> ChatResult: ...
+
+    def stream_chat(self, request: ChatRequest) -> Iterator[ChatStreamChunk]: ...
 
     def embed(self, request: EmbeddingRequest) -> EmbeddingResult: ...
 

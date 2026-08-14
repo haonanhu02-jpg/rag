@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import json
+from collections.abc import Callable, Iterator
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from fastapi import (
     status,
 )
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from starlette.responses import StreamingResponse
 
 from rag_platform.bootstrap.r2_runtime import R2Runtime
 from rag_platform.domain.authorization import AuthorizationContext, TrustedPrincipal
@@ -29,8 +31,19 @@ from rag_platform.domain.identifiers import (
     TraceId,
 )
 from rag_platform.domain.policies import AccessDenied, ResourceNotFound
+from rag_platform.modules.grounded_rag import (
+    CancellationToken,
+    CitationIntegrityError,
+    FixedRagAnswer,
+    GenerationBudgetExceeded,
+    GenerationCancelled,
+    RagCitation,
+    RagStreamEvent,
+)
 from rag_platform.modules.knowledge.contracts import IdempotencyConflict, UnsupportedDocument
+from rag_platform.modules.model_runtime.contracts import ModelRuntimeError, ModelTimeout
 from rag_platform.modules.retrieval.contracts import (
+    FilterExpression,
     SearchDependencyError,
     combine_filters,
     parse_filter_expression,
@@ -66,6 +79,73 @@ class FixedRagBody(ApiModel):
         if self.top_n > self.top_k:
             raise ValueError("top_n cannot exceed top_k")
         return self
+
+
+def _user_filter(body: FixedRagBody) -> FilterExpression | None:
+    expressions = tuple(parse_filter_expression(item) for item in body.filters)
+    if body.filter_expression is not None:
+        expressions += (parse_filter_expression(body.filter_expression),)
+    return combine_filters(expressions)
+
+
+def _citation_payload(item: RagCitation) -> dict[str, object]:
+    bounding_box = item.bounding_box
+    return {
+        "schema_version": item.schema_version,
+        "tenant_id": str(item.tenant_id),
+        "knowledge_base_id": str(item.knowledge_base_id),
+        "document_id": str(item.document_id),
+        "document_version_id": str(item.document_version_id),
+        "chunk_id": str(item.chunk_id),
+        "quote": item.quote,
+        "page_number": item.page_number,
+        "bounding_box": (
+            None
+            if bounding_box is None
+            else {
+                "x0": bounding_box.x0,
+                "y0": bounding_box.y0,
+                "x1": bounding_box.x1,
+                "y1": bounding_box.y1,
+                "coordinate_space": bounding_box.coordinate_space,
+            }
+        ),
+        "source_uri": item.source_uri,
+        "media_kind": item.media_kind,
+        "source": dict(item.source),
+        "trace_id": str(item.trace_id),
+    }
+
+
+def _answer_payload(answer: FixedRagAnswer) -> dict[str, object]:
+    return {
+        "status": answer.status,
+        "evidence_status": answer.evidence_status.value,
+        "evidence_reason": answer.evidence_reason,
+        "answer": answer.answer,
+        "citations": [_citation_payload(item) for item in answer.citations],
+        "trace_id": str(answer.trace_id),
+        "prompt_version": answer.prompt_version,
+        "model_id": answer.model_id,
+        "input_tokens": answer.input_tokens,
+        "output_tokens": answer.output_tokens,
+        "cost_microunits": answer.cost_microunits,
+        "model_attempts": answer.model_attempts,
+        "degradation_steps": list(answer.degradation_steps),
+    }
+
+
+def _stream_payload(event: RagStreamEvent) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "sequence": event.sequence,
+        "event": event.event,
+        "attributes": dict(event.attributes),
+    }
+    if event.delta:
+        payload["delta"] = event.delta
+    if event.answer is not None:
+        payload["answer"] = _answer_payload(event.answer)
+    return payload
 
 
 def _context(
@@ -179,10 +259,7 @@ def build_router(runtime: R2Runtime) -> APIRouter:
         x_request_id: Annotated[str | None, Header()] = None,
     ) -> dict[str, object]:
         try:
-            expressions = tuple(parse_filter_expression(item) for item in body.filters)
-            if body.filter_expression is not None:
-                expressions += (parse_filter_expression(body.filter_expression),)
-            user_filter = combine_filters(expressions)
+            user_filter = _user_filter(body)
         except ValueError as exc:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
         answer = runtime.grounded_rag.answer(
@@ -196,27 +273,44 @@ def build_router(runtime: R2Runtime) -> APIRouter:
             user_filter=user_filter,
             request_id=x_request_id,
         )
-        return {
-            "status": answer.status,
-            "answer": answer.answer,
-            "citations": [
-                {
-                    "tenant_id": str(item.tenant_id),
-                    "knowledge_base_id": str(item.knowledge_base_id),
-                    "document_id": str(item.document_id),
-                    "document_version_id": str(item.document_version_id),
-                    "chunk_id": str(item.chunk_id),
-                    "quote": item.quote,
-                    "source": item.source,
-                }
-                for item in answer.citations
-            ],
-            "trace_id": str(answer.trace_id),
-            "prompt_version": answer.prompt_version,
-            "model_id": answer.model_id,
-            "input_tokens": answer.input_tokens,
-            "output_tokens": answer.output_tokens,
-        }
+        return _answer_payload(answer)
+
+    @router.post("/rag/query/stream", tags=["knowledge"])
+    def stream_fixed_rag(
+        body: FixedRagBody,
+        context: Annotated[AuthorizationContext, Depends(_context)],
+        x_request_id: Annotated[str | None, Header()] = None,
+    ) -> StreamingResponse:
+        try:
+            user_filter = _user_filter(body)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        cancellation = CancellationToken()
+
+        def events() -> Iterator[str]:
+            try:
+                for event in runtime.grounded_rag.stream_answer(
+                    context,
+                    question=body.question,
+                    knowledge_base_ids=tuple(
+                        KnowledgeBaseId(value) for value in body.knowledge_base_ids
+                    ),
+                    top_k=body.top_k,
+                    top_n=body.top_n,
+                    history=tuple(body.history),
+                    target_languages=tuple(body.target_languages),
+                    user_filter=user_filter,
+                    request_id=x_request_id,
+                    cancellation=cancellation,
+                ):
+                    data = json.dumps(
+                        _stream_payload(event), ensure_ascii=False, separators=(",", ":")
+                    )
+                    yield f"id: {event.sequence}\nevent: {event.event}\ndata: {data}\n\n"
+            finally:
+                cancellation.cancel()
+
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     @router.get("/retrieval-traces/{trace_id}", tags=["knowledge"])
     def get_trace(
@@ -277,3 +371,10 @@ def install_error_handlers(app: object) -> None:
     active.add_exception_handler(IdempotencyConflict, handler("idempotency_conflict", 409))
     active.add_exception_handler(UnsupportedDocument, handler("unsupported_document", 415))
     active.add_exception_handler(SearchDependencyError, handler("search_dependency_failed", 503))
+    active.add_exception_handler(ModelTimeout, handler("model_timeout", 504))
+    active.add_exception_handler(ModelRuntimeError, handler("model_dependency_failed", 502))
+    active.add_exception_handler(CitationIntegrityError, handler("citation_integrity_failed", 502))
+    active.add_exception_handler(
+        GenerationBudgetExceeded, handler("generation_budget_exceeded", 429)
+    )
+    active.add_exception_handler(GenerationCancelled, handler("generation_cancelled", 409))

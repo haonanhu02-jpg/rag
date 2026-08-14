@@ -15,7 +15,7 @@ from rag_platform.adapters.outbound.postgres import (
 from rag_platform.adapters.outbound.system import SystemClock, UuidGenerator
 from rag_platform.bootstrap.settings import Settings
 from rag_platform.domain.identifiers import KnowledgeBaseId, TraceId
-from rag_platform.modules.grounded_rag import GroundedRag
+from rag_platform.modules.grounded_rag import GenerationBudget, GroundedRag
 from rag_platform.modules.knowledge import KnowledgeService
 from rag_platform.modules.knowledge.compiler import DocumentCompiler
 from rag_platform.modules.knowledge.contracts import OcrEngine
@@ -27,6 +27,7 @@ from rag_platform.orchestration.ingestion_graph import IngestionGraph
 
 EMBEDDING_MODEL_ID = "r2-deterministic-embedding"
 CHAT_MODEL_ID = "r2-deterministic-chat"
+CHAT_FALLBACK_MODEL_ID = "r5-deterministic-chat-fallback"
 RERANKER_MODEL_ID = "r4-deterministic-reranker"
 
 
@@ -52,6 +53,12 @@ class R2Runtime:
                     CHAT_MODEL_ID,
                     "deterministic",
                     "grounded-template-v1",
+                    ModelKind.CHAT,
+                ),
+                ModelRegistration(
+                    CHAT_FALLBACK_MODEL_ID,
+                    "deterministic",
+                    "grounded-template-v1-fallback",
                     ModelKind.CHAT,
                 ),
                 ModelRegistration(
@@ -95,7 +102,17 @@ class R2Runtime:
         self.grounded_rag = GroundedRag(
             retrieval=self.retrieval,
             models=self.models,
+            authority=self.repository,
             chat_model_id=CHAT_MODEL_ID,
+            fallback_chat_model_ids=(CHAT_FALLBACK_MODEL_ID,),
+            max_context_characters=settings.rag_max_context_characters,
+            minimum_evidence_score=settings.rag_minimum_evidence_score,
+            generation_budget=GenerationBudget(
+                settings.rag_max_input_tokens,
+                settings.rag_max_output_tokens,
+                settings.rag_max_cost_microunits,
+            ),
+            model_timeout_seconds=settings.rag_model_timeout_seconds,
         )
 
     def close(self) -> None:
