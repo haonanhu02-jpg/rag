@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "report_id": "rag-greenfield-r5-grounded-rag",
+  "stage": "R5",
+  "status": "completed",
+  "generated_at": "2026-08-14",
+  "source": {
+    "commit": "ab950f34f998d839b4239f1b564a9a0c85937a62"
+  },
+  "scope": {
+    "capabilities": [
+      "CAP-17",
+      "CAP-21",
+      "CAP-27",
+      "CAP-36",
+      "CAP-37"
+    ],
+    "evidence_statuses": [
+      "sufficient",
+      "partial_evidence",
+      "no_evidence",
+      "conflicting_evidence"
+    ],
+    "citation_schema_version": 2,
+    "stream_transport": "server_sent_events",
+    "langchain_model_adapter": true,
+    "langgraph_online_hot_path": false
+  },
+  "evidence": {
+    "legacy_behavior_observations": 5,
+    "system_owned_evidence_policy": true,
+    "deterministic_refusal": true,
+    "post_generation_postgresql_authority_revalidation": true,
+    "tenant_kb_version_chunk_page_bbox_quote_source_trace_binding": true,
+    "unknown_missing_revoked_citation_negative": true,
+    "ordered_stream_fallback_cancel_interruption": true,
+    "model_timeout_retry_fallback_token_cost_budget": true,
+    "real_postgresql_elasticsearch_sse_e2e": true,
+    "legacy_json_api_additive_compatibility": true,
+    "deterministic_fake_evaluation": "contract_only_not_quality",
+    "real_model_evaluation": "not_run_missing_provider_credentials",
+    "dataset": "datasets/r5/grounded-answer-v1.jsonl",
+    "source_reuse": "none"
+  },
+  "migration_head": "20260814_0004",
+  "next_stage": "R6"
+}
